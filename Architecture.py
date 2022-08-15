@@ -1,11 +1,6 @@
 import numpy as np
 
 class Node():
-    # def __init__(self):
-    #     # None type input_layer implies ValueLayer (???)
-    #     self.input_layer = None
-    #     self.input_weights = [1.0]
-    #     # Note that somehow input_weights on the input layer should be fixed at 1.0
 
     def __init__(self, input_layer):
         self.input_layer = input_layer
@@ -16,7 +11,6 @@ class Node():
 
 
 class Layer():
-#    nodes = []
 
     def __init__(self, size: int, input_layer):
         self.nodes = [Node(input_layer)] * size
@@ -30,6 +24,7 @@ class Layer():
 
 
 class ValueLayer():
+
     def __init__(self, global_input_values: list[np.float32]):
         self.global_input_values = global_input_values
 
