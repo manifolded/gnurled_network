@@ -59,11 +59,18 @@ class Value_layer():
     def adjust_global_input_values(self, global_input_values: np.array):
         self.global_input_values = global_input_values
 
-input_values = [1.0, -0.5]
-layer0 = ValueLayer(input_values)
-layer1 = Layer(3, layer0)
+    # To be furnished for the construction of the immediately downstream genuine
+    # input layer's input weights, which should be held constant.
+    def gen_diag_weights_2D(self) -> np.array:
+        return np.identity(self.size())
+
+
+
 input_values = np.array([1.0, -0.5, 2.0])
 layer0 = Value_layer(input_values)
+
+layer1 = Layer(3, layer0.gen_diag_weights_2D(), layer0)
+
 layers = [layer0, layer1]
 
 print([val for val in layers[-1].outputs()])
