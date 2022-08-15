@@ -38,7 +38,7 @@ class Layer():
         return len(self.nodes)
 
     def outputs(self) -> list[np.float32]:
-        # inputs = input_layer.outputs()
+        return np.array([node.output() for node in self.nodes])
         return [node.output() for node in self.nodes]
 
 
