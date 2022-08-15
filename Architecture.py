@@ -55,9 +55,13 @@ class Layer():
         return [node.output() for node in self.nodes]
 
 
-class ValueLayer():
-
-    def __init__(self, global_input_values: list[np.float32]):
+""" 
+A value layer is a layer that produces pre-set values. It is intended to 
+serve in the role of a fake extra input_layer that provides values to the 
+actual input layer. While it pretends to be a 'Layer' it has no nodes 
+and only spits out exactly what you last specified with the
+adjust_global_input_values method.
+"""
 class Value_layer():
     def __init__(self, global_input_values: np.array):
         assert(np.linalg.matrix_rank(global_input_values) == 1)
