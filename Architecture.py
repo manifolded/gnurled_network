@@ -20,13 +20,11 @@ class Node():
         assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
                 init_input_weights_1D.shape == (input_layer.size(), ))
             
-    def __init__(self, input_layer):
         self.input_layer = input_layer
         self.input_weights = init_input_weights_1D
 
     def output(self) -> np.float32:
         return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs()))
-
 
 class Layer():
     def __init__(self, size: int, init_input_weights_2D: np.array, input_layer):
@@ -52,7 +50,6 @@ class Layer():
 
     def outputs(self) -> list[np.float32]:
         return np.array([node.output() for node in self.nodes])
-        return [node.output() for node in self.nodes]
 
 
 """ 
