@@ -1,5 +1,18 @@
 import numpy as np
 
+"""
+Nodes are the vertices in the network. They provide a minimal unit of 
+computation. Nodes are combined to make layers, see class Layers for 
+more detail. 
+
+The outputs of the nodes of the layer immediately upstream provide
+each node's inputs. These inputs are weighted before being combined into a 
+single output scalar. 
+
+By design nodes own the weights for their connections with the nodes of the 
+directly upstream layer. They do not own the weights for their downstream 
+connections which are owned instead for the nodes of the next layer.
+"""
 class Node():
     def __init__(self, init_input_weights_1D: np.array, input_layer):
         assert(input_layer.size() > 0)
