@@ -26,6 +26,21 @@ class Node():
     def output(self) -> np.float32:
         return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs()))
 
+
+"""
+Layers are ranks of nodes of any length. These nodes all receive their inputs
+from the nodes of the previous (upstream) layer, and output their computations
+to the nodes of the next (downstream) layer.
+
+The number of inputs to any node is always the size of the previous layer 
+since every one of its nodes' output is one of this node's inputs.
+
+Layers breakup the provided init_input_weights_2D and construct each node with
+the appropriate column of the matrix.
+
+A Layer must check if its previous layer is a Value_layer because this 
+situation dictates that the init_input_weights_2D be the identity matrix.
+"""
 class Layer():
     def __init__(self, size: int, init_input_weights_2D: np.array, input_layer):
         assert(size > 0)
