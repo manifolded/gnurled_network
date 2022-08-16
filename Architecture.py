@@ -15,7 +15,7 @@ directly upstream layer. They do not own the weights for their downstream
 connections which are owned instead for the nodes of the next layer.
 """
 class Node():
-    def __init__(self, init_input_weights_1D: np.array, input_layer):
+    def __init__(self, init_input_weights_1D: np.array, init_bias: np.float32, input_layer):
         assert(input_layer.size() > 0)
         # init_input_weights_1D must be 1D for a simple node
         assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
@@ -23,6 +23,7 @@ class Node():
             
         self.input_layer = input_layer
         self.input_weights = init_input_weights_1D
+        self.bias = init_bias
 
     def output(self) -> np.float32:
         return sigmoid(sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias)
@@ -43,7 +44,7 @@ A Layer must check if its previous layer is a Value_layer because this
 situation dictates that the init_input_weights_2D be the identity matrix.
 """
 class Layer():
-    def __init__(self, size: int, init_input_weights_2D: np.array, input_layer):
+    def __init__(self, size: int, init_input_weights_2D: np.array, init_biases_1D: np.array, input_layer):
         assert(size > 0)
         assert(len(init_input_weights_2D.shape) == 2)
     
@@ -57,9 +58,12 @@ class Layer():
         'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
         .format(input_layer.size(), size, init_input_weights_2D.shape)
 
+        assert init_biases_1D.shape == (size,),\
+        'init_biases_1D extents {} must match layer size {}'.format(init_biases_1D.shape[0], size)
+
         self.nodes = []
         for n in range(size):
-            self.nodes.append(Node(init_input_weights_2D[:,n], input_layer))
+            self.nodes.append(Node(init_input_weights_2D[:,n], init_biases_1D[n], input_layer))
 
     def size(self):
         return len(self.nodes)
@@ -109,7 +113,9 @@ def sigmoid(input: np.float32) -> np.float32:
 input_values = np.array([1.0, -0.5, 2.0])
 layer0 = Value_layer(input_values)
 
-layer1 = Layer(3, layer0.gen_diag_weights_2D(), layer0)
+size_1 = 3
+init_biases_layer_1 = np.array([1.0]*size_1)
+layer1 = Layer(size_1, layer0.gen_diag_weights_2D(), init_biases_layer_1, layer0)
 
 layers = [layer0, layer1]
 
