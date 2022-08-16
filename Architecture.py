@@ -1,4 +1,5 @@
 import numpy as np
+from math import exp
 
 """
 Nodes are the vertices in the network. They provide a minimal unit of 
@@ -24,7 +25,7 @@ class Node():
         self.input_weights = init_input_weights_1D
 
     def output(self) -> np.float32:
-        return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs()))
+        return sigmoid(sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias)
 
 
 """
@@ -92,6 +93,16 @@ class Value_layer():
     # input layer's input weights, which should be held constant.
     def gen_diag_weights_2D(self) -> np.array:
         return np.identity(self.size())
+
+
+"""
+Implementation of the classic node activation function called the sigmoid 
+function, $\frac{1}{1 + e^{-x}}$. Despite the fact that I will inevitably be 
+coding up the derivative before long, I don't think I'm going to make this a
+class. I don't want the overhead of a constructor.
+"""
+def sigmoid(input: np.float32) -> np.float32:
+    return 1./(1. + exp(- input))
 
 
 
