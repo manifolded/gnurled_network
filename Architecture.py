@@ -100,6 +100,41 @@ class InjectionLayer():
     # input layer's input weights, which should be held constant.
     def gen_diag_weights_2D(self) -> np.array:
         return np.identity(self.size)
+class Network():
+    """
+    Holds the list of Layers that defines the network. Also provides convenient
+    initialization and update methods.
+    """
+    def __init__(self, layer_sizes: tuple):
+        assert all([size > 0 for size in layer_sizes])
+
+        self.layers = []
+        self.layers.append(InjectionLayer(layer_sizes[0]))
+        # Note that both the 0th and 1st layers are required to have the same size
+        self.layers.append(Layer(layer_sizes[0], 
+                                 self.layers[0].gen_diag_weights_2D(),
+                                 all_zeros_array((layer_sizes[0],)),
+                                 self.layers[0]))
+        for idx, size in enumerate(layer_sizes[2:]):
+            self.layers.append(Layer(size, 
+                                     all_ones_array((layer_sizes[idx - 1], size)),
+                                     all_ones_array((size,)),
+                                     self.layers[-1]))
+
+    def outputs(self) -> np.array:
+        return self.layers[-1].outputs()
+
+    def adjust_global_input_values(self, global_input_values: np.array):
+        assert np.linalg.matrix_rank(global_input_values) == 1
+        assert global_input_values.shape[0] == self.layers[0].size()
+        self.layers[0].adjust_global_input_values(global_input_values)
+    
+
+def all_zeros_array(shape: tuple) -> np.array:
+    return np.zeros(shape, dtype=np.float32)
+
+def all_ones_array(shape: tuple) -> np.array:
+    return np.ones(shape, dtype=np.float32)
 
 
 def sigmoid(input: np.float32) -> np.float32:
