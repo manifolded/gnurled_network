@@ -1,6 +1,7 @@
 import numpy as np
 from math import exp, tan, pi, prod
 from numpy.random import rand
+from itertools import islice
 
 class Node():
     """
@@ -110,19 +111,26 @@ class Network():
     """
     def __init__(self, layer_sizes: tuple):
         assert all([size > 0 for size in layer_sizes])
+        # Prepend leading InjectionLayer which is hidden from the user
+        #   Note that both the 0th and 1st layers are required to have the same size
+        true_layer_sizes = (layer_sizes[0],) + layer_sizes
 
         self.layers = []
-        self.layers.append(InjectionLayer(layer_sizes[0]))
-        # Note that both the 0th and 1st layers are required to have the same size
-        self.layers.append(Layer(layer_sizes[0], 
+        # Insert layer 0
+        self.layers.append(InjectionLayer(true_layer_sizes[0]))
+        # Insert Layer 1
+        self.layers.append(Layer(true_layer_sizes[1], 
                                  self.layers[0].gen_diag_weights_2D(),
-                                 all_zeros_array((layer_sizes[0],)),
+                                 all_zeros_array((true_layer_sizes[1],)),
                                  self.layers[0]))
-        for idx, size in enumerate(layer_sizes[2:]):
-            self.layers.append(Layer(size, 
-                                     all_ones_array((layer_sizes[idx - 1], size)),
-                                     all_ones_array((size,)),
-                                     self.layers[-1]))
+        # Insert all the rest
+        # Skip the first two entries that have already been constructed.
+        for idx, size in enumerate(true_layer_sizes):
+            if(idx >= 2):
+                self.layers.append(Layer(size, 
+                                        random_array((true_layer_sizes[idx - 1], size)),
+                                        random_array((size,)),
+                                        self.layers[idx - 1]))
 
     def outputs(self) -> np.array:
         return self.layers[-1].outputs()
@@ -159,13 +167,10 @@ def sigmoid(input: np.float32) -> np.float32:
     return 1./(1. + exp(- input))
 
 
-print(random_array((3,4)))
+layer_sizes = (3,6,2)
+input_values = np.array([1.0, -0.5, 2.0])
 
-# layer_sizes = (3,)
-# input_values = np.array([1.0, -0.5, 2.0])
-
-# network = Network(layer_sizes)
-# network.adjust_global_input_values(input_values)
-# print([val for val in network.outputs()])
-
-# print([layer.size() for layer in network.layers])
+network = Network(layer_sizes)
+network.adjust_global_input_values(input_values)
+print([layer.size() for layer in network.layers])
+print([val for val in network.outputs()])
