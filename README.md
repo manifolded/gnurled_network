@@ -26,4 +26,5 @@ want to get this one working first.
     - Current implementation fails to vectorize
 - figure out how to declare the type Layer on input argument
     - Why can't a class take itself as an argument in its constructor?
+- Implement random initialization for weights and biases
 

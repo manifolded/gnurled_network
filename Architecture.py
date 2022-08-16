@@ -1,5 +1,6 @@
 import numpy as np
-from math import exp
+from math import exp, tan, pi, prod
+from numpy.random import rand
 
 class Node():
     """
@@ -138,6 +139,15 @@ def all_zeros_array(shape: tuple) -> np.array:
 def all_ones_array(shape: tuple) -> np.array:
     return np.ones(shape, dtype=np.float32)
 
+def tan_random_float() -> np.float32: 
+    return (lambda x: tan(2.*pi*(x - 0.5)))(rand())
+
+def random_array(shape: tuple) -> np.array:
+    ranlist = []
+    for _ in range(prod(shape)):
+        ranlist.append(tan_random_float())
+    # https://opensourceoptions.com/blog/10-ways-to-initialize-a-numpy-array-how-to-create-numpy-arrays/
+    return np.array(ranlist).reshape(shape)
 
 def sigmoid(input: np.float32) -> np.float32:
     """
@@ -149,12 +159,13 @@ def sigmoid(input: np.float32) -> np.float32:
     return 1./(1. + exp(- input))
 
 
+print(random_array((3,4)))
 
-layer_sizes = (3,)
-input_values = np.array([1.0, -0.5, 2.0])
+# layer_sizes = (3,)
+# input_values = np.array([1.0, -0.5, 2.0])
 
-network = Network(layer_sizes)
-network.adjust_global_input_values(input_values)
-print([val for val in network.outputs()])
+# network = Network(layer_sizes)
+# network.adjust_global_input_values(input_values)
+# print([val for val in network.outputs()])
 
-print([layer.size() for layer in network.layers])
+# print([layer.size() for layer in network.layers])
