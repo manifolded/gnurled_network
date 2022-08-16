@@ -16,10 +16,10 @@ class Node():
     connections which are owned instead for the nodes of the next layer.
     """
     def __init__(self, init_input_weights_1D: np.array, init_bias: np.float32, input_layer):
-        assert(input_layer.size() > 0)
+        assert(input_layer.size > 0)
         # init_input_weights_1D must be 1D for a simple node
-        assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
-                init_input_weights_1D.shape == (input_layer.size(), ))
+        assert(init_input_weights_1D.shape == (input_layer.size, 1) or \
+                init_input_weights_1D.shape == (input_layer.size, ))
             
         self.input_layer = input_layer
         self.input_weights = init_input_weights_1D
@@ -51,10 +51,10 @@ class Layer():
         # If the immediately upstream layer is a InjectionLayer, require that it 
         # have same size as this layer.
         if isinstance(input_layer, InjectionLayer):
-            assert input_layer.size() == size,\
+            assert input_layer.size == size,\
             'upstream is InjectionLayer -> sizes must match'
         
-        assert init_input_weights_2D.shape == (input_layer.size(), size),\
+        assert init_input_weights_2D.shape == (input_layer.size, size),\
         'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
         .format(input_layer.size(), size, init_input_weights_2D.shape)
 
@@ -65,7 +65,7 @@ class Layer():
         for n in range(size):
             self.nodes.append(Node(init_input_weights_2D[:,n], init_biases_1D[n], input_layer))
 
-    def size(self):
+    def size(self) -> int:
         return len(self.nodes)
 
     def outputs(self) -> list[np.float32]:
@@ -80,23 +80,26 @@ class InjectionLayer():
     and only spits out exactly what you last specified with the 
     adjust_global_input_values method.
     """
-    def __init__(self, global_input_values: np.array):
-        assert(np.linalg.matrix_rank(global_input_values) == 1)
-        self.global_input_values = global_input_values
+    def __init__(self, size: int):
+        # construct empty global_input_values
+        self.global_input_values = np.array([None]*size)
+        self.size = size
 
-    def size(self):
-        return self.global_input_values.shape[0]
+    def size(self) -> int:
+        return self.size
 
     def outputs(self) -> list[np.float32]:
         return self.global_input_values
 
     def adjust_global_input_values(self, global_input_values: np.array):
+        assert np.linalg.matrix_rank(global_input_values) == 1
+        assert global_input_values.shape[0] == self.size
         self.global_input_values = global_input_values
 
     # To be furnished for the construction of the immediately downstream genuine
     # input layer's input weights, which should be held constant.
     def gen_diag_weights_2D(self) -> np.array:
-        return np.identity(self.size())
+        return np.identity(self.size)
 
 
 def sigmoid(input: np.float32) -> np.float32:
@@ -109,11 +112,12 @@ def sigmoid(input: np.float32) -> np.float32:
     return 1./(1. + exp(- input))
 
 
+size_1 = 3
 
 input_values = np.array([1.0, -0.5, 2.0])
-layer0 = InjectionLayer(input_values)
+layer0 = InjectionLayer(size_1)
+layer0.adjust_global_input_values(input_values)
 
-size_1 = 3
 init_biases_layer_1 = np.array([1.0]*size_1)
 layer1 = Layer(size_1, layer0.gen_diag_weights_2D(), init_biases_layer_1, layer0)
 
