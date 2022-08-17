@@ -24,7 +24,8 @@ want to get this one working first.
     [ ] Add back-propagation algorithm
     [ ] Convert calcs implementation to matrix mult
         - Current implementation fails to vectorize
-    [ ] figure out how to declare the type Layer on input argument
+    [ ] Figure out how to declare the type Layer on input argument
     [ ] Why can't a class take itself as an argument in its constructor?
-    [ ] Implement random initialization for weights and biases
+    [x] Implement random initialization for weights and biases
     [x] Convert this list to md checklist
+    [ ] Incorporate learning rate in add_delta_weights
