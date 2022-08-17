@@ -1,3 +1,5 @@
+from platform import node
+from xml.dom.minicompat import NodeList
 import numpy as np
 from math import exp, tan, pi, prod
 from numpy.random import rand
@@ -41,6 +43,11 @@ class Node():
     def output(self) -> np.float32:
         return sigmoid(sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias)
 
+    def cost(self, label: np.float32, output: np.float32 = None) -> np.float32:
+        # Avoid unnecessarily recomputing output by passing as arg
+        out = output if output is not None else self.output()
+        delta = label - out
+        return delta * delta
 
 class Layer():
     """
@@ -107,6 +114,15 @@ class Layer():
     def outputs(self) -> list[np.float32]:
         return np.array([node.output() for node in self.nodes])
 
+    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
+        assert len(labels.shape) == 1,\
+            'Labels rank must be 1, not {}'.format(len(labels.shape))
+        assert labels.shape[0] == self.size(),\
+            'Labels must have the same number of elements {} as there are nodes in this layer {}.'\
+            .format(labels.shape[0], self.size())
+        # Avoid unnecessarily recomputing output by passing as arg
+        outs = outputs if outputs is not None else self.outputs()
+        return sum([node.cost(labels[n], outs[n]) for n, node in enumerate(self.nodes)])
 
 class InjectionLayer():
     """ 
@@ -175,6 +191,23 @@ class Network():
 
     def outputs(self) -> np.array:
         return self.layers[-1].outputs()
+
+    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
+        assert len(labels.shape) == 1,\
+            'Labels rank must be 1, not {}'.format(len(labels.shape))
+        final_layer_size = self.layer_sizes()[-1]
+        assert labels.shape[0] == final_layer_size,\
+            'Labels must have the same number of elements {} as there are nodes in the final layer {}.'\
+            .format(labels.shape[0], final_layer_size)
+
+        # Avoid recomputing the outputs by passing in the value with the 2nd argument
+        outs = outputs if outputs is not None else self.outputs()
+        return self.layers[-1].cost(labels, outs)
+        
+    def print_status(self, i: int, example: dict):
+        result = self.outputs()
+        cost = network.cost(example['labels'], result)
+        print(i, result, cost)
 
     def adjust_global_input_values(self, global_input_values: np.array):
         assert np.linalg.matrix_rank(global_input_values) == 1
@@ -255,20 +288,29 @@ def sigmoid(input: np.float32) -> np.float32:
     be coding up the derivative before long, I don't think I'm going to make 
     this a class. I don't want the overhead of a constructor.
     """
+    # Overflows will often show up here. There's no reason to try and catch
+    # them. It's natural for the code to crash when it is diverging.
     return 1./(1. + exp(- input))
 
 
-layer_sizes = (3,6,2)
+### Construct example
 input_values = np.array([1.0, -0.5, 2.0])
+label_values = np.array([0.7, 1.1])
+example = {'features': input_values,
+           'labels': label_values}
 
+### Construct network
+layer_sizes = (3,6,2)
 network = Network(layer_sizes)
-network.adjust_global_input_values(input_values)
-print([val for val in network.outputs()])
 
+### Set inputs
+network.adjust_global_input_values(example['features'])
+network.print_status(0, example)
 
-for _ in range(30):
+### Apply random deltas to the weights and biases
+for iteration in range(1, 30):
     delta_weights = network.random_delta_weights()
     network.add_delta_weights(delta_weights)
     delta_biases = network.random_delta_biases()
     network.add_delta_biases(delta_biases)
-    print([val for val in network.outputs()])
+    network.print_status(iteration, example)

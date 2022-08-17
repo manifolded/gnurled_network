@@ -30,3 +30,5 @@ want to get this one working first.
     [x] Convert this list to md checklist
     [ ] Incorporate learning rate in add_delta_weights
     [x] Implement add_delta_biases()
+    [x] Implement cost functions at every level
+
