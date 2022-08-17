@@ -1,7 +1,6 @@
 import numpy as np
 from math import exp, tan, pi, prod
 from numpy.random import rand
-from itertools import islice
 
 class Node():
     """
@@ -28,7 +27,9 @@ class Node():
         self.bias = init_bias
 
     def add_delta_weights(self, delta_weights: np.array):
-        assert np.linalg.matrix_rank(delta_weights) == 1
+        assert len(delta_weights.shape) == 1,\
+            'delta_weights rank must be 1, not {}'\
+            .format(len(delta_weights.shape))
         assert delta_weights.shape[0] == self.input_layer.size(),\
             'Node: Size of previous layer, {}, must match size of delta_weights, {}.'\
             .format(self.input_layer.size(), delta_weights.shape[0])
@@ -62,11 +63,9 @@ class Layer():
         if isinstance(input_layer, InjectionLayer):
             assert input_layer.size() == size,\
             'upstream is InjectionLayer -> sizes must match'
-        
         assert init_input_weights_2D.shape == (input_layer.size(), size),\
             'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
             .format(input_layer.size(), size, init_input_weights_2D.shape)
-
         assert init_biases_1D.shape == (size,),\
             'init_biases_1D extents {} must match layer size {}'\
             .format(init_biases_1D.shape[0], size)
@@ -80,12 +79,17 @@ class Layer():
         return len(self.nodes)
 
     def add_delta_weights(self, delta_weights: np.array):
+        assert len(delta_weights.shape) == 2,\
+            'delta_weights rank must be 2, not {}'\
+            .format(len(delta_weights.shape))
         assert delta_weights.shape[1] == self.size(),\
             'Number of nodes {} must match delta_weights\' 2nd extents {}'\
             .format(self.size(), delta_weights.shape[1])
         assert delta_weights.shape[0] == self.input_layer.size(),\
             'Number of nodes in previous layer {} must match delta_weight\'s 1st extents {}'\
             .format(delta_weights.shape[0], self.input_layer.size())
+        for idx, node in enumerate(self.nodes):
+            node.add_delta_weights(delta_weights[:,idx])
 
     def outputs(self) -> list[np.float32]:
         return np.array([node.output() for node in self.nodes])
@@ -161,13 +165,13 @@ class Network():
         assert global_input_values.shape[0] == self.layers[0].size()
         self.layers[0].adjust_global_input_values(global_input_values)
 
-    def add_delta_weights(self, delta_weights: np.array):
+    def add_delta_weights(self, delta_weights: list):
         # The zeroth layer has no weights. The first layer has fixed weights, 
         # so no delta. Thus the first two elements of delta_weights are 
         # ignored.
         assert len(delta_weights) == len(self.layers),\
-        'Length of delta_weights must match number of layers, they were {} and {} respectively.'\
-        .format(len(self.layers), len(delta_weights))
+            'Length of delta_weights must match number of layers, they were {} and {} respectively.'\
+            .format(len(self.layers), len(delta_weights))
         for idx, layer_matrix in enumerate(delta_weights):
             if(idx >= 2):
                 self.layers[idx].add_delta_weights(layer_matrix)
@@ -179,10 +183,9 @@ class Network():
         result = [np.empty(()), np.empty(())]
         layer_sizes = self.layer_sizes()
         true_layer_sizes = (layer_sizes[0],) + layer_sizes
-        print(true_layer_sizes)
         for idx, size in enumerate(true_layer_sizes):
             if(idx >= 2):
-                result.append(random_array((size, true_layer_sizes[idx - 1])))
+                result.append(random_array((true_layer_sizes[idx - 1], size)))
         return result
 
 
@@ -217,19 +220,8 @@ input_values = np.array([1.0, -0.5, 2.0])
 
 network = Network(layer_sizes)
 network.adjust_global_input_values(input_values)
-
-print([layer.size() for layer in network.layers])
 print([val for val in network.outputs()])
 
-# delta_weights = network.random_delta_weights()
-# print([dw for dw in delta_weights])
-
-delta_weights = [np.empty(()), np.empty(()),
-    all_zeros_array((3,6)), all_zeros_array((6,2))]
-
-print([dw for dw in delta_weights])
-
+delta_weights = network.random_delta_weights()
 network.add_delta_weights(delta_weights)
-
-print([layer.size() for layer in network.layers])
 print([val for val in network.outputs()])
