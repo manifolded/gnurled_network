@@ -20,7 +20,7 @@ want to get this one working first.
     [x] Add biases
     [x] Add class Network
         - To help simplify assembly of a typical network
-    [ ] Add add_delta_weights
+    [x] Add add_delta_weights
     [ ] Add back-propagation algorithm
     [ ] Convert calcs implementation to matrix mult
         - Current implementation fails to vectorize
@@ -29,3 +29,4 @@ want to get this one working first.
     [x] Implement random initialization for weights and biases
     [x] Convert this list to md checklist
     [ ] Incorporate learning rate in add_delta_weights
+    [x] Implement add_delta_biases()

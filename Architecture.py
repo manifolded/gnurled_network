@@ -26,6 +26,9 @@ class Node():
         self.input_weights = init_input_weights_1D
         self.bias = init_bias
 
+    def add_delta_bias(self, delta_bias: np.float32):
+        self.bias += delta_bias
+
     def add_delta_weights(self, delta_weights: np.array):
         assert len(delta_weights.shape) == 1,\
             'delta_weights rank must be 1, not {}'\
@@ -77,6 +80,16 @@ class Layer():
 
     def size(self) -> int:
         return len(self.nodes)
+
+    def add_delta_biases(self, delta_biases_1D: np.array):
+        assert len(delta_biases_1D.shape) == 1,\
+            'Rank of delta_biases_1D must be 1, not {}'\
+            .format(len(delta_biases_1D.shape))
+        assert delta_biases_1D.shape[0] == self.size(),\
+            'Dim of delta_biases_1D {} must equal number of nodes {}.'\
+            .format(delta_biases_1D.shape[0], self.size())
+        for n, node in enumerate(self.nodes):
+            node.add_delta_bias(delta_biases_1D[n])
 
     def add_delta_weights(self, delta_weights: np.array):
         assert len(delta_weights.shape) == 2,\
@@ -157,6 +170,9 @@ class Network():
         true_layer_sizes = [layer.size() for layer in self.layers]
         return tuple(true_layer_sizes[1:])
 
+    def num_layers(self) -> int:
+        return len(self.layer_sizes())
+
     def outputs(self) -> np.array:
         return self.layers[-1].outputs()
 
@@ -164,6 +180,22 @@ class Network():
         assert np.linalg.matrix_rank(global_input_values) == 1
         assert global_input_values.shape[0] == self.layers[0].size()
         self.layers[0].adjust_global_input_values(global_input_values)
+
+    def add_delta_biases(self, delta_biases_2D: list):
+        # The zeroth layer has no biases. Thus the first element of 
+        # delta_biases_2D is ignored.
+        assert all([len(delta_biases_2D[l].shape) == 1\
+            for l in range(1, self.num_layers())]),\
+            'Each array in delta_biases_2D must be rank 1, not {}.'\
+            .format((len(delta_biases_2D[l].shape)))
+        true_layer_sizes = (self.layer_sizes()[0],) + self.layer_sizes()
+        assert all([delta_biases_2D[l].size == true_layer_sizes[l]\
+            for l in range(1, self.num_layers())]),\
+            'delta_biases_2D sizes {} must match layer sizes {}.'\
+            .format((l.size() for l in delta_biases_2D[1:]), self.layer_sizes())
+        for l, layer in enumerate(self.layers):
+            if(l>=1):
+                layer.add_delta_biases(delta_biases_2D[l])
 
     def add_delta_weights(self, delta_weights: list):
         # The zeroth layer has no weights. The first layer has fixed weights, 
@@ -175,6 +207,17 @@ class Network():
         for idx, layer_matrix in enumerate(delta_weights):
             if(idx >= 2):
                 self.layers[idx].add_delta_weights(layer_matrix)
+
+    def random_delta_biases(self) -> list:
+        # The zeroth layer has no biases. Thus the first element of 
+        # delta_biases is left empty.
+        result = [np.empty(())]
+        layer_sizes = self.layer_sizes()
+        true_layer_sizes = (layer_sizes[0],) + layer_sizes
+        for idx, size in enumerate(true_layer_sizes):
+            if(idx >= 1):
+                result.append(random_array((true_layer_sizes[idx],)))
+        return result
 
     def random_delta_weights(self) -> list:
         # The zeroth layer has no weights. The first layer has fixed weights, 
@@ -222,6 +265,10 @@ network = Network(layer_sizes)
 network.adjust_global_input_values(input_values)
 print([val for val in network.outputs()])
 
-delta_weights = network.random_delta_weights()
-network.add_delta_weights(delta_weights)
-print([val for val in network.outputs()])
+
+for _ in range(30):
+    delta_weights = network.random_delta_weights()
+    network.add_delta_weights(delta_weights)
+    delta_biases = network.random_delta_biases()
+    network.add_delta_biases(delta_biases)
+    print([val for val in network.outputs()])
