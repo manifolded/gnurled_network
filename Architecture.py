@@ -40,8 +40,15 @@ class Node():
             .format(self.input_layer.size(), delta_weights.shape[0])
         self.input_weights += delta_weights
 
+    def _coalesced_input(self) -> np.float32:
+        """
+        Returns the 'pre-activation output' aka 'coalesced input' of this 
+        node.
+        """
+        return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias
+
     def output(self) -> np.float32:
-        return sigmoid(sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias)
+        return sigmoid(self._coalesced_input())
 
     def cost(self, label: np.float32, output: np.float32 = None) -> np.float32:
         # Avoid unnecessarily recomputing output by passing as arg
@@ -110,6 +117,13 @@ class Layer():
             .format(delta_weights.shape[0], self.input_layer.size())
         for idx, node in enumerate(self.nodes):
             node.add_delta_weights(delta_weights[:,idx])
+
+    def _coalesced_inputs(self) -> np.array:
+        """
+        Returns an array of the 'pre-activation outputs' aka 'coalesced 
+        inputs' of the nodes in this layer.
+        """
+        return np.array([n._coalesced_input() for n in self.nodes])
 
     def outputs(self) -> list[np.float32]:
         return np.array([node.output() for node in self.nodes])
@@ -223,7 +237,7 @@ class Network():
         # so no delta. Thus the first two elements of delta_weights are 
         # ignored.
         assert len(delta_weights) == len(self.layers),\
-            'Length of delta_weights must match number of layers, they were {} and {} respectively.'\
+            'Length of delta_weights {} must match number of layers {}.'\
             .format(len(self.layers), len(delta_weights))
         for idx, layer_matrix in enumerate(delta_weights):
             if(idx >= 2):
@@ -252,6 +266,7 @@ class Network():
                 result.append(random_array((true_layer_sizes[idx - 1], size)))
         return result
 
+    # ============================
     # Toolkit for Back-Propagation 
     def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
         assert len(labels.shape) == 1,\
@@ -276,10 +291,10 @@ class Network():
         outs = outputs if outputs is not None else self.outputs()
         return np.array([-((label/out) + (1. - label)/(1. - out)) for label, out in zip(labels, outs)])
 
-    def deriv_a_wrt_z(self, layer_id: int, z_layer_inputs: np.array = None) -> np.array:
+    def deriv_a_wrt_z(self, layer_id: int) -> np.array:
         """
         Computes the derivative of the network's outputs with respect to the 
-        nodes' consolidated inputs, often denoted as 'z^l_n'.
+        nodes' coalesced inputs, often denoted as 'z^l_n'.
 
         layer_id: int - indicates which layer's outputs to be differentiated
         z_layer_inputs: np.array - contains the PRE-activation node values for 
@@ -287,8 +302,7 @@ class Network():
         pre-activation outputs. It means the same thing. Designated z^l_n to 
         distinguish them from layer activations, always designated a^l_n.
         """
-        zs = z_layer_inputs if z_layer_inputs is not None else self.layers[layer_id]._consolidated_inputs()
-        return np.array([deriv_sig(z) for z in z_layer_inputs])
+        return np.array([deriv_sig(z) for z in self.layers[layer_id]._coalesced_inputs()])
 
     def deriv_z_wrt_weights(self, layer_id: int) -> np.array:
         """
@@ -330,23 +344,13 @@ class Network():
         num_nodes_fm1 = self.layer_sizes()[-2]
         result = np.array((num_nodes_fm1, num_nodes_f), dtype=np.float32)
 
-        return np.einsum('n, n, m -> m, n', 
-                         self.deriv_Cost_wrt_a_output(labels),
-                         self.deriv_a_wrt_z(-1),
-                         self.deriv_z_wrt_weights(-1))
+        return - np.einsum('n, n, m -> m n', 
+                           self.deriv_Cost_wrt_a_output(labels),
+                           self.deriv_a_wrt_z(-1),
+                           self.deriv_z_wrt_weights(-1))
 
 
-        
-        
-        
-
-
-    
-
-
-
-
-
+# ============================================
 def all_zeros_array(shape: tuple) -> np.array:
     return np.zeros(shape, dtype=np.float32)
 
@@ -371,7 +375,7 @@ def sigmoid(input: np.float32) -> np.float32:
     this a class. I don't want the overhead of a constructor.
     """
     # Overflows will often show up here. There's no reason to try and catch
-    # them. It's natural for the code to crash when it is diverging.
+    # them. It's natural for the code to crash when it's wildly diverging.
     return 1./(1. + exp(- input))
 
 def deriv_sig(input: np.float32) -> np.float32:
@@ -390,17 +394,25 @@ example = {'features': input_values,
 layer_sizes = (3,6,2)
 network = Network(layer_sizes)
 
+learning_rate = 0.001
+
 ### Set inputs
 network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
-### Apply random deltas to the weights and biases
-for iteration in range(1, 2):
-    delta_weights = network.random_delta_weights()
+
+
+for iteration in range(1, 10):
+    print(f'iteration {iteration} --- final layer delta weights calcs:')
+    print('deriv_Cost_wrt_a_output:', network.deriv_Cost_wrt_a_output(label_values))
+    print('deriv_a_wrt_z:', network.deriv_a_wrt_z(-1))
+    print('deriv_z_wrt_weights:', network.deriv_z_wrt_weights(-1))
+    delta_weights_1 = all_zeros_array((3,6))
+    delta_weights_2 = network.delta_weights_f_layer(example['labels'], learning_rate)
+    delta_weights = [None, None, delta_weights_1, delta_weights_2]
+    print('delta_weights_f_layer', delta_weights)
+
     network.add_delta_weights(delta_weights)
-    delta_biases = network.random_delta_biases()
-    network.add_delta_biases(delta_biases)
     network.print_status(iteration, example)
 
 
-print(network.deriv_z_wrt_a(1))
