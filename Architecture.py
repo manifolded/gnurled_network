@@ -1,5 +1,5 @@
 from platform import node
-from xml.dom.minicompat import NodeList
+# from xml.dom.minicompat import NodeList
 import numpy as np
 from math import exp, tan, pi, prod
 from numpy.random import rand
@@ -192,18 +192,6 @@ class Network():
     def outputs(self) -> np.array:
         return self.layers[-1].outputs()
 
-    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
-        assert len(labels.shape) == 1,\
-            'Labels rank must be 1, not {}'.format(len(labels.shape))
-        final_layer_size = self.layer_sizes()[-1]
-        assert labels.shape[0] == final_layer_size,\
-            'Labels must have the same number of elements {} as there are nodes in the final layer {}.'\
-            .format(labels.shape[0], final_layer_size)
-
-        # Avoid recomputing the outputs by passing in the value with the 2nd argument
-        outs = outputs if outputs is not None else self.outputs()
-        return self.layers[-1].cost(labels, outs)
-        
     def print_status(self, i: int, example: dict):
         result = self.outputs()
         cost = network.cost(example['labels'], result)
@@ -264,6 +252,100 @@ class Network():
                 result.append(random_array((true_layer_sizes[idx - 1], size)))
         return result
 
+    # Toolkit for Back-Propagation 
+    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
+        assert len(labels.shape) == 1,\
+            'Labels rank must be 1, not {}'.format(len(labels.shape))
+        final_layer_size = self.layer_sizes()[-1]
+        assert labels.shape[0] == final_layer_size,\
+            'Labels must have the same number of elements {} as there are nodes in the final layer {}.'\
+            .format(labels.shape[0], final_layer_size)
+
+        # Avoid recomputing the outputs by passing in the value with the 2nd argument
+        outs = outputs if outputs is not None else self.outputs()
+        return self.layers[-1].cost(labels, outs)
+        
+    def deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
+        """
+        Computes the derivative of the cost function with respect to the 
+        network's outputs.
+
+        labels: np.array - ground truth results expected
+        outputs: np.array - the network's prediction
+        """
+        outs = outputs if outputs is not None else self.outputs()
+        return np.array([-((label/out) + (1. - label)/(1. - out)) for label, out in zip(labels, outs)])
+
+    def deriv_a_wrt_z(self, layer_id: int, z_layer_inputs: np.array = None) -> np.array:
+        """
+        Computes the derivative of the network's outputs with respect to the 
+        nodes' consolidated inputs, often denoted as 'z^l_n'.
+
+        layer_id: int - indicates which layer's outputs to be differentiated
+        z_layer_inputs: np.array - contains the PRE-activation node values for 
+        layer 'l'. These may be known either as coalesced inputs or 
+        pre-activation outputs. It means the same thing. Designated z^l_n to 
+        distinguish them from layer activations, always designated a^l_n.
+        """
+        zs = z_layer_inputs if z_layer_inputs is not None else self.layers[layer_id]._consolidated_inputs()
+        return np.array([deriv_sig(z) for z in z_layer_inputs])
+
+    def deriv_z_wrt_weights(self, layer_id: int) -> np.array:
+        """
+        Computes the derivative of 'z^l_n' in terms of the weights, 'W^l_{m n}'
+        which turns out to be nothing more than the post-activation ouputs of 
+        layer 'l'. 
+
+        layer_id: int - is 'l' which indicates to which layer these quantities belong
+        """
+        # Note that output is strangely independent of the layer
+        #    node index. Turns out it must be. 
+
+        #### Should I add in the usual input caching check? Not for an internal layer? ####
+        return self.layers[layer_id - 1].outputs()
+
+    def deriv_z_wrt_a(self, layer_id: int) -> np.array:
+        """
+        Computes the dervative of 'z^l_n' in terms of the previous layer's
+        post-activation node outputs 'a^(l-1)_m' which turns out to be the 
+        weights 'W^l_{m n}'
+
+        layer_id: int - 'l', which indicates to which layer these quantities 
+            belong
+        """        
+        num_nodes_l = self.layer_sizes()[layer_id]
+        num_nodes_lm1 = self.layer_sizes()[layer_id - 1]
+        result = np.array((num_nodes_lm1, num_nodes_l), dtype=np.float32)
+        for n in range(num_nodes_l):
+            result[:,n] = self.layers[layer_id].nodes[n].input_weights
+        return result
+
+    def delta_weights_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
+        """
+        Computes delta_weights for the output layer.
+
+        learning_rate: np.float32 - arbitrary coefficient for delta_weights
+        """
+        num_nodes_f = self.layer_sizes()[-1]
+        num_nodes_fm1 = self.layer_sizes()[-2]
+        result = np.array((num_nodes_fm1, num_nodes_f), dtype=np.float32)
+
+        return np.einsum('n, n, m -> m, n', 
+                         self.deriv_Cost_wrt_a_output(labels),
+                         self.deriv_a_wrt_z(-1),
+                         self.deriv_z_wrt_weights(-1))
+
+
+        
+        
+        
+
+
+    
+
+
+
+
 
 def all_zeros_array(shape: tuple) -> np.array:
     return np.zeros(shape, dtype=np.float32)
@@ -292,6 +374,11 @@ def sigmoid(input: np.float32) -> np.float32:
     # them. It's natural for the code to crash when it is diverging.
     return 1./(1. + exp(- input))
 
+def deriv_sig(input: np.float32) -> np.float32:
+    emx:np.float64 = - exp(input)
+    return np.float32(- emx/((1. + emx)*(1. + emx)))
+
+
 
 ### Construct example
 input_values = np.array([1.0, -0.5, 2.0])
@@ -308,9 +395,12 @@ network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
 ### Apply random deltas to the weights and biases
-for iteration in range(1, 30):
+for iteration in range(1, 2):
     delta_weights = network.random_delta_weights()
     network.add_delta_weights(delta_weights)
     delta_biases = network.random_delta_biases()
     network.add_delta_biases(delta_biases)
     network.print_status(iteration, example)
+
+
+print(network.deriv_z_wrt_a(1))

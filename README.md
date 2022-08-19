@@ -31,4 +31,5 @@ want to get this one working first.
     [ ] Incorporate learning rate in add_delta_weights
     [x] Implement add_delta_biases()
     [x] Implement cost functions at every level
+    [ ] Figure out how to store outputs so they don't need to be recomputed all the time
 
