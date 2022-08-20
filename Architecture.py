@@ -20,10 +20,17 @@ class Node():
     connections which are owned instead for the nodes of the next layer.
     """
     def __init__(self, init_input_weights_1D: np.array, init_bias: np.float32, input_layer):
-        assert(input_layer.size() > 0)
-        # init_input_weights_1D must be 1D for a simple node
-        assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
-                init_input_weights_1D.shape == (input_layer.size(), ))
+        if input_layer is not None:
+            assert(input_layer.size() > 0)
+            # init_input_weights_1D must be 1D for a simple node
+            assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
+                    init_input_weights_1D.shape == (input_layer.size(), ))
+        else:
+            assert init_input_weights_1D is None,\
+                "You must not specify init_input_weights_1D for the input layer."
+            assert init_bias is None,\
+                "You must not specify init_bias for the input layer."
+
             
         self.input_layer = input_layer
         self.input_weights = init_input_weights_1D
@@ -61,7 +68,7 @@ class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
     from the nodes of the previous (upstream) layer, and output their computations
-    to the nodes of the next (downstream) layer.
+    to the nodes of the subsequent (downstream) layer.
 
     The number of inputs to any node is always the size of the previous layer 
     since every one of its nodes' output is one of this node's inputs.
@@ -72,26 +79,39 @@ class Layer():
     A Layer must check if its previous layer is a InjectionLayer because this 
     situation dictates that the init_input_weights_2D be the identity matrix.
     """
-    def __init__(self, size: int, init_input_weights_2D: np.array, init_biases_1D: np.array, input_layer):
-        assert(size > 0)
-        assert(len(init_input_weights_2D.shape) == 2)
-    
-        # If the immediately upstream layer is a InjectionLayer, require that it 
-        # have same size as this layer.
-        if isinstance(input_layer, InjectionLayer):
-            assert input_layer.size() == size,\
-            'upstream is InjectionLayer -> sizes must match'
-        assert init_input_weights_2D.shape == (input_layer.size(), size),\
-            'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
-            .format(input_layer.size(), size, init_input_weights_2D.shape)
-        assert init_biases_1D.shape == (size,),\
-            'init_biases_1D extents {} must match layer size {}'\
-            .format(init_biases_1D.shape[0], size)
+    def __init__(self, size: int, init_input_weights_2D: np.array, 
+                 init_biases_1D: np.array, input_layer):
+        assert(size > 0),\
+            f"layer sizes must be strictly positive, not ({size})"
+
+        if input_layer is not None:
+            assert(len(init_input_weights_2D.shape) == 2)
+            assert init_input_weights_2D.shape == (input_layer.size(), size),\
+                'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
+                .format(input_layer.size(), size, init_input_weights_2D.shape)
+            assert init_biases_1D.shape == (size,),\
+                'init_biases_1D extents {} must match layer size {}'\
+                .format(init_biases_1D.shape[0], size)
+        else:
+            assert init_input_weights_2D is None,\
+                "You must not specify init_input_weights_2D for the input layer."
+            assert init_biases_1D is None,\
+                "You must not specify init_biases_1D for the input layer."
+
+
+
 
         self.input_layer = input_layer
+
         self.nodes = []
-        for n in range(size):
-            self.nodes.append(Node(init_input_weights_2D[:,n], init_biases_1D[n], input_layer))
+        if input_layer is not None:
+            for n in range(size):
+                self.nodes.append(Node(init_input_weights_2D[:,n], init_biases_1D[n], input_layer))
+        else:
+            for n in range(size):
+                self.nodes.append(Node(None, None, None))
+
+        self.global_input_values = None
 
     def size(self) -> int:
         return len(self.nodes)
@@ -127,7 +147,14 @@ class Layer():
         return np.array([n._coalesced_input() for n in self.nodes])
 
     def outputs(self) -> list[np.float32]:
-        return np.array([node.output() for node in self.nodes])
+        if self.input_layer is None:
+            # Forget the nodes and just compute the layer output array directly
+            return np.vectorize(sigmoid)(self.global_input_values)
+        else:
+            # Doesn't this seem clunky and possibly slow?
+            return np.array([node.output() for node in self.nodes])
+
+
 
     def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
         assert len(labels.shape) == 1,\
@@ -139,36 +166,6 @@ class Layer():
         outs = outputs if outputs is not None else self.outputs()
         return sum([node.cost(labels[n], outs[n]) for n, node in enumerate(self.nodes)])
 
-class InjectionLayer():
-    """ 
-    An injection layer is a layer that produces pre-set values. It is intended 
-    to serve in the role of a fake extra input_layer that provides values to 
-    the actual input layer. While it pretends to be a 'Layer' it has no nodes 
-    and only spits out exactly what you last specified with the 
-    adjust_global_input_values method.
-    """
-    def __init__(self, size: int):
-        # construct empty global_input_values
-        self.global_input_values = np.array([None]*size)
-        self._size = size
-
-    def size(self) -> int:
-        return self._size
-
-    def outputs(self) -> list[np.float32]:
-        return self.global_input_values
-
-    def adjust_global_input_values(self, global_input_values: np.array):
-        assert np.linalg.matrix_rank(global_input_values) == 1
-        assert global_input_values.shape[0] == self._size
-        self.global_input_values = global_input_values
-
-    # To be furnished for the construction of the immediately downstream genuine
-    # input layer's input weights, which should be held constant.
-    def gen_diag_weights_2D(self) -> np.array:
-        return np.identity(self._size)
-
-
 class Network():
     """
     Holds the list of Layers that defines the network. Also provides convenient
@@ -176,30 +173,26 @@ class Network():
     """
     def __init__(self, layer_sizes: tuple):
         assert all([size > 0 for size in layer_sizes])
-        # Prepend leading InjectionLayer which is hidden from the user
-        #   Note that both the 0th and 1st layers are required to have the same size
-        true_layer_sizes = (layer_sizes[0],) + layer_sizes
 
         self.layers = []
-        # Insert layer 0
-        self.layers.append(InjectionLayer(true_layer_sizes[0]))
-        # Insert Layer 1
-        self.layers.append(Layer(true_layer_sizes[1], 
-                                 self.layers[0].gen_diag_weights_2D(),
-                                 all_zeros_array((true_layer_sizes[1],)),
-                                 self.layers[0]))
+        # Insert Layer 0
+        self.layers.append(Layer(layer_sizes[0], 
+                                 None,
+                                 None,
+                                 None))
+        
         # Insert all the rest
-        # Skip the first two entries that have already been constructed.
-        for idx, size in enumerate(true_layer_sizes):
-            if(idx >= 2):
+        # Skip the first, already constructed, entry
+        for idx, size in enumerate(layer_sizes):
+            if(idx >= 1):
                 self.layers.append(Layer(size, 
-                                        random_array((true_layer_sizes[idx - 1], size)),
+                                        random_array((layer_sizes[idx - 1], size)),
                                         random_array((size,)),
                                         self.layers[idx - 1]))
 
     def layer_sizes(self) -> tuple:
-        true_layer_sizes = [layer.size() for layer in self.layers]
-        return tuple(true_layer_sizes[1:])
+        layer_sizes = [layer.size() for layer in self.layers]
+        return tuple(layer_sizes)
 
     def num_layers(self) -> int:
         return len(self.layer_sizes())
@@ -213,62 +206,59 @@ class Network():
         print(i, result, cost)
 
     def adjust_global_input_values(self, global_input_values: np.array):
-        assert np.linalg.matrix_rank(global_input_values) == 1
-        assert global_input_values.shape[0] == self.layers[0].size()
-        self.layers[0].adjust_global_input_values(global_input_values)
+        assert len(global_input_values.shape) == 1,\
+            f"global_input_values' rank must be 1 not ({len(global_input_values.shape)})."
+        layer_sizes = self.layer_sizes()
+        assert layer_sizes[0] == global_input_values.size,\
+            f'Network(): global_input_values size ({global_input_values.size})'\
+            +'does not match layer 0 spec size ({layer_sizes[0]}).'
+        # Only apply the global_input_values to the 0th layer
+        self.layers[0].global_input_values = global_input_values
 
     def add_delta_biases(self, delta_biases_2D: list):
         # The zeroth layer has no biases. Thus the first element of 
         # delta_biases_2D is ignored.
-        ranks = [0 if delta_biases[l] is None else len(delta_biases[l].shape) for l in range(1, self.num_layers())]
+        ranks = [0 if delta_biases[l] is None else len(delta_biases[l].shape) for l in range(self.num_layers())]
         rankish = map(lambda x: x <= 1, ranks)
         assert all(rankish),\
             'Each array in delta_biases_2D must be None or rank 1, not {}.'\
             .format((len(delta_biases_2D[l].shape)))
 
-        true_layer_sizes = (self.layer_sizes()[0],) + self.layer_sizes()
         dims = [-1 if delta_biases[l] is None else delta_biases[l].size for l in range(self.num_layers())]
-        dimish = [x == y for x,y in zip(dims, true_layer_sizes)]
-        print('add_delta_biases: ', dims)
+        dimish = [x == y for x,y in zip(dims, self.layer_sizes())]
         assert all(dimish[1:]),\
             'delta_biases_2D sizes {} must match layer sizes {}.'\
-            .format(([dims[l] for l in delta_biases_2D[1:]]), self.layer_sizes())
+            .format(([dims[l] for l in delta_biases_2D[1:]]), self.layer_sizes()[1:])
         for l, layer in enumerate(self.layers):
             if(l>=1):
                 layer.add_delta_biases(delta_biases_2D[l])
 
     def add_delta_weights(self, delta_weights: list):
-        # The zeroth layer has no weights. The first layer has fixed weights, 
-        # so no delta. Thus the first two elements of delta_weights are 
-        # ignored.
+        # The zeroth layer has no weights or biases. Thus the first element of 
+        # delta_weights is ignored.
         assert len(delta_weights) == len(self.layers),\
             'Length of delta_weights {} must match number of layers {}.'\
             .format(len(self.layers), len(delta_weights))
         for idx, layer_matrix in enumerate(delta_weights):
-            if(idx >= 2):
+            if(idx >= 1):
                 self.layers[idx].add_delta_weights(layer_matrix)
 
     def random_delta_biases(self) -> list:
         # The zeroth layer has no biases. Thus the first element of 
         # delta_biases is left empty.
         result = [np.empty(())]
-        layer_sizes = self.layer_sizes()
-        true_layer_sizes = (layer_sizes[0],) + layer_sizes
-        for idx, size in enumerate(true_layer_sizes):
-            if(idx >= 1):
-                result.append(random_array((true_layer_sizes[idx],)))
+        for l in range(len(self.layer_sizes())):
+            if(l >= 1):
+                result.append(random_array((self.layer_sizes()[l],)))
         return result
 
     def random_delta_weights(self) -> list:
-        # The zeroth layer has no weights. The first layer has fixed weights, 
-        # so no delta. Thus the first two elements of delta_weights are 
+        # The zeroth layer has no weights and no biase. Thus the first element of delta_weights is 
         # left empty.
-        result = [np.empty(()), np.empty(())]
-        layer_sizes = self.layer_sizes()
-        true_layer_sizes = (layer_sizes[0],) + layer_sizes
-        for idx, size in enumerate(true_layer_sizes):
+        result = [None]
+        for idx, size in enumerate(self.layer_sizes()):
             if(idx >= 2):
-                result.append(random_array((true_layer_sizes[idx - 1], size)))
+                result.append(random_array((self.layer_sizes()[idx - 1], size)))
         return result
 
     # ============================
@@ -433,11 +423,10 @@ for iteration in range(1, 10):
     # print('deriv_z_wrt_weights:', network.deriv_z_wrt_weights(-1))
     delta_weights_1 = all_zeros_array((3,6))
     delta_weights_2 = network.compute_delta_weights_f_layer(example['labels'], learning_rate)
-    delta_weights = [None, None, delta_weights_1, delta_weights_2]
-    delta_biases_0 = all_zeros_array((3,))
+    delta_weights = [None, delta_weights_1, delta_weights_2]
     delta_biases_1 = all_zeros_array((6,))
     delta_biases_2 = network.compute_delta_biases_f_layer(example['labels'], learning_rate)
-    delta_biases = [None, delta_biases_0, delta_biases_1, delta_biases_2]
+    delta_biases = [None, delta_biases_1, delta_biases_2]
 #    print('delta_weights_f_layer', delta_weights, delta_biases)
 
     network.add_delta_weights(delta_weights)
