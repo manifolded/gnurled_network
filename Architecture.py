@@ -1,8 +1,9 @@
 from platform import node
+from random import Random
 # from xml.dom.minicompat import NodeList
 import numpy as np
 from math import exp, tan, pi, prod
-from numpy.random import rand
+# from numpy.random import rand
 
 class Node():
     """
@@ -219,15 +220,19 @@ class Network():
     def add_delta_biases(self, delta_biases_2D: list):
         # The zeroth layer has no biases. Thus the first element of 
         # delta_biases_2D is ignored.
-        assert all([len(delta_biases_2D[l].shape) == 1\
-            for l in range(1, self.num_layers())]),\
-            'Each array in delta_biases_2D must be rank 1, not {}.'\
+        ranks = [0 if delta_biases[l] is None else len(delta_biases[l].shape) for l in range(1, self.num_layers())]
+        rankish = map(lambda x: x <= 1, ranks)
+        assert all(rankish),\
+            'Each array in delta_biases_2D must be None or rank 1, not {}.'\
             .format((len(delta_biases_2D[l].shape)))
+
         true_layer_sizes = (self.layer_sizes()[0],) + self.layer_sizes()
-        assert all([delta_biases_2D[l].size == true_layer_sizes[l]\
-            for l in range(1, self.num_layers())]),\
+        dims = [-1 if delta_biases[l] is None else delta_biases[l].size for l in range(self.num_layers())]
+        dimish = [x == y for x,y in zip(dims, true_layer_sizes)]
+        print('add_delta_biases: ', dims)
+        assert all(dimish[1:]),\
             'delta_biases_2D sizes {} must match layer sizes {}.'\
-            .format((l.size() for l in delta_biases_2D[1:]), self.layer_sizes())
+            .format(([dims[l] for l in delta_biases_2D[1:]]), self.layer_sizes())
         for l, layer in enumerate(self.layers):
             if(l>=1):
                 layer.add_delta_biases(delta_biases_2D[l])
@@ -334,7 +339,14 @@ class Network():
             result[:,n] = self.layers[layer_id].nodes[n].input_weights
         return result
 
-    def delta_weights_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
+    def deriv_z_wrt_b(self, layer_id: int) -> np.array:
+        """
+        Computes the derivative of 'z^l_n' with respect to the layer's biases
+        'b^l_n', which turns out to be just ones.
+        """
+        return all_ones_array((self.layer_sizes()[layer_id],))
+
+    def compute_delta_weights_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
         """
         Computes delta_weights for the output layer.
 
@@ -344,10 +356,22 @@ class Network():
         num_nodes_fm1 = self.layer_sizes()[-2]
         result = np.array((num_nodes_fm1, num_nodes_f), dtype=np.float32)
 
-        return - np.einsum('n, n, m -> m n', 
-                           self.deriv_Cost_wrt_a_output(labels),
-                           self.deriv_a_wrt_z(-1),
-                           self.deriv_z_wrt_weights(-1))
+        return -learning_rate * np.einsum('n, n, m -> m n', 
+                                          self.deriv_Cost_wrt_a_output(labels),
+                                          self.deriv_a_wrt_z(-1),
+                                          self.deriv_z_wrt_weights(-1))
+
+    def compute_delta_biases_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
+        """
+        Computes delta_biases for the output layer.
+
+        learning_rate: np.float32 - arbitrary coefficient for delta_biases
+        """
+        num_nodes_f = self.layer_sizes()[-1]
+        return -learning_rate * np.einsum('n, n, n -> n',
+                                          self.deriv_Cost_wrt_a_output(labels),
+                                          self.deriv_a_wrt_z(-1),
+                                          self.deriv_z_wrt_b(-1))
 
 
 # ============================================
@@ -358,7 +382,7 @@ def all_ones_array(shape: tuple) -> np.array:
     return np.ones(shape, dtype=np.float32)
 
 def tan_random_float() -> np.float32: 
-    return (lambda x: tan(2.*pi*(x - 0.5)))(rand())
+    return (lambda x: tan(2.*pi*(x - 0.5)))(R.random())
 
 def random_array(shape: tuple) -> np.array:
     ranlist = []
@@ -383,8 +407,10 @@ def deriv_sig(input: np.float32) -> np.float32:
     return np.float32(- emx/((1. + emx)*(1. + emx)))
 
 
-
+### ==================================================
 ### Construct example
+R = Random()
+R.seed(8397459)
 input_values = np.array([1.0, -0.5, 2.0])
 label_values = np.array([0.7, 1.1])
 example = {'features': input_values,
@@ -394,25 +420,28 @@ example = {'features': input_values,
 layer_sizes = (3,6,2)
 network = Network(layer_sizes)
 
-learning_rate = 0.001
+learning_rate = 0.1
 
 ### Set inputs
 network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
-
-
 for iteration in range(1, 10):
     print(f'iteration {iteration} --- final layer delta weights calcs:')
-    print('deriv_Cost_wrt_a_output:', network.deriv_Cost_wrt_a_output(label_values))
-    print('deriv_a_wrt_z:', network.deriv_a_wrt_z(-1))
-    print('deriv_z_wrt_weights:', network.deriv_z_wrt_weights(-1))
+    # print('deriv_Cost_wrt_a_output:', network.deriv_Cost_wrt_a_output(label_values))
+    # print('deriv_a_wrt_z:', network.deriv_a_wrt_z(-1))
+    # print('deriv_z_wrt_weights:', network.deriv_z_wrt_weights(-1))
     delta_weights_1 = all_zeros_array((3,6))
-    delta_weights_2 = network.delta_weights_f_layer(example['labels'], learning_rate)
+    delta_weights_2 = network.compute_delta_weights_f_layer(example['labels'], learning_rate)
     delta_weights = [None, None, delta_weights_1, delta_weights_2]
-    print('delta_weights_f_layer', delta_weights)
+    delta_biases_0 = all_zeros_array((3,))
+    delta_biases_1 = all_zeros_array((6,))
+    delta_biases_2 = network.compute_delta_biases_f_layer(example['labels'], learning_rate)
+    delta_biases = [None, delta_biases_0, delta_biases_1, delta_biases_2]
+#    print('delta_weights_f_layer', delta_weights, delta_biases)
 
     network.add_delta_weights(delta_weights)
+    network.add_delta_biases(delta_biases)
     network.print_status(iteration, example)
 
 
