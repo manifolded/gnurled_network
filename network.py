@@ -1,10 +1,6 @@
-from platform import node
 from random import Random
-# from xml.dom.minicompat import NodeList
 import numpy as np
 from math import exp, tan, pi, prod
-# from numpy.random import rand
-import time
 
 class Node():
     """
@@ -425,88 +421,41 @@ class Network():
 
         return list(zip(delta_weights, delta_biases))
 
+class RandomUtils():
+    def __init__(self, seed: int):
+        R = Random()
+        R.seed(seed)
 
+    def tan_random_float(self) -> np.float32: 
+        return (lambda x: tan(2.*pi*(x - 0.5)))(self.R.random())
 
-# ============================================
-def all_zeros_array(shape: tuple) -> np.array:
-    return np.zeros(shape, dtype=np.float32)
+    def random_array(self, shape: tuple) -> np.array:
+        ranlist = []
+        for _ in range(prod(shape)):
+            ranlist.append(self.tan_random_float())
+        # https://opensourceoptions.com/blog/10-ways-to-initialize-a-numpy-array-how-to-create-numpy-arrays/
+        return np.array(ranlist).reshape(shape)
 
-def all_ones_array(shape: tuple) -> np.array:
-    return np.ones(shape, dtype=np.float32)
+class ArrayUtils():
+    def all_zeros_array(shape: tuple) -> np.array:
+        return np.zeros(shape, dtype=np.float32)
 
-def tan_random_float() -> np.float32: 
-    return (lambda x: tan(2.*pi*(x - 0.5)))(R.random())
-
-def dustin_random_float() -> np.float32:
-    return 12.*R.random() - 6.
-
-def random_array(shape: tuple) -> np.array:
-    ranlist = []
-    for _ in range(prod(shape)):
-        ranlist.append(tan_random_float())
-#        ranlist.append(dustin_random_float)
-    # https://opensourceoptions.com/blog/10-ways-to-initialize-a-numpy-array-how-to-create-numpy-arrays/
-    return np.array(ranlist).reshape(shape)
-
-def sigmoid(input: np.float32) -> np.float32:
+    def all_ones_array(shape: tuple) -> np.array:
+        return np.ones(shape, dtype=np.float32)
+class Activation():
     """
     Implementation of the classic node activation function called the sigmoid 
     function, $\\frac{1}{1 + e^{-x}}$. Despite the fact that I will inevitably 
     be coding up the derivative before long, I don't think I'm going to make 
     this a class. I don't want the overhead of a constructor.
     """
-    # Overflows will often show up here. There's no reason to try and catch
-    # them. It's natural for the code to crash when it's wildly diverging.
-    return 1./(1. + exp(- input))
+    def sigmoid(input: np.float32) -> np.float32:
+        # Overflows will often show up here. There's no reason to try and catch
+        # them. It's natural for the code to crash when it's wildly diverging.
+        return 1./(1. + exp(- input))
 
-def deriv_sig(input: np.float32) -> np.float32:
-    emx:np.float64 = exp(-input)
-    assert emx > 0.,\
-        f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
-    return np.float32(- emx/((1. + emx)*(1. + emx)))
-
-
-def char(C: int) -> str:
-    return chr(C + ord('a'))
-
-
-
-
-### ==================================================
-start_time = time.process_time()
-
-### Construct example
-R = Random()
-R.seed(1234)
-input_values = np.array([-8., 72.0, 0.26])
-label_values = np.array([0.6, 0.2])
-example = {'features': input_values,
-        'labels': label_values}
-
-### Construct network
-layer_sizes = (3,5,2)
-network = Network(layer_sizes)
-
-learning_rate = 0.01
-
-### Set inputs
-network.adjust_global_input_values(example['features'])
-network.print_status(0, example)
-
-
-deltas_new = network.compute_delta_weights_and_biases(example['features'], learning_rate)
-deltas_old = network.compute_delta_weights_and_biases__old(example['features'], learning_rate)
-
-for (nw,nb),(ow,ob) in zip(deltas_new, deltas_old):
-    print(nb)
-    print(ob)
-
-
-
-# for iteration in range(1, 100):
-#     print(f'iteration {iteration} --- all layers weights\' calcs:')
-#     delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
-#     network.add_delta_weights_and_biases(delta_weights_and_biases)
-#     network.print_status(iteration, example)
-
-print(time.process_time() - start_time, "seconds")
+    def deriv_sig(input: np.float32) -> np.float32:
+        emx:np.float64 = exp(-input)
+        assert emx > 0.,\
+            f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
+        return np.float32(- emx/((1. + emx)*(1. + emx)))
