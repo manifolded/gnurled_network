@@ -57,7 +57,7 @@ class Node():
         return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias
 
     def output(self) -> np.float32:
-        return sigmoid(self._coalesced_input())
+        return Activation.sigmoid(self._coalesced_input())
 
     def cost(self, label: np.float32, output: np.float32 = None) -> np.float32:
         # Avoid unnecessarily recomputing output by passing as arg
@@ -151,7 +151,7 @@ class Layer():
     def outputs(self) -> list[np.float32]:
         if self.input_layer is None:
             # Forget the nodes and just compute the layer output array directly
-            return np.vectorize(sigmoid)(self.global_input_values)
+            return np.vectorize(Activation.sigmoid)(self.global_input_values)
         else:
             # Doesn't this seem clunky and possibly slow?
             return np.array([node.output() for node in self.nodes])
@@ -171,7 +171,7 @@ class Network():
     Holds the list of Layers that defines the network. Also provides convenient
     initialization and update methods.
     """
-    def __init__(self, layer_sizes: tuple):
+    def __init__(self, layer_sizes: tuple, array_generator):
         assert all([size > 0 for size in layer_sizes])
 
         self.layers = []
@@ -185,8 +185,8 @@ class Network():
         for idx, size in enumerate(layer_sizes):
             if(idx >= 1):
                 self.layers.append(Layer(size, 
-                                         random_array((layer_sizes[idx - 1], size)),
-                                         random_array((size,)),
+                                         array_generator((layer_sizes[idx - 1], size)),
+                                         array_generator((size,)),
                                          self.layers[idx - 1]))
 
     def layer_sizes(self) -> tuple:
@@ -201,7 +201,7 @@ class Network():
 
     def print_status(self, i: int, example: dict):
         result = self.outputs()
-        cost = network.cost(example['labels'], result)
+        cost = self.cost(example['labels'], result)
         print(i, result, cost)
 
     def adjust_global_input_values(self, global_input_values: np.array):
@@ -231,8 +231,8 @@ class Network():
         layer_sizes = self.layer_sizes()
         for idx, size in enumerate(layer_sizes):
             if(idx >= 1):
-                result.append((random_array((layer_sizes[idx - 1], size)),  
-                               random_array((size,))))
+                result.append((RandomUtils.random_array((layer_sizes[idx - 1], size)),  
+                               RandomUtils.random_array((size,))))
         return result
 
     # ============================
@@ -271,7 +271,7 @@ class Network():
         pre-activation outputs. It means the same thing. Designated z^l_n to 
         distinguish them from layer activations, always designated a^l_n.
         """
-        return np.array([deriv_sig(z) for z in self.layers[layer_id]._coalesced_inputs()])
+        return np.array([Activation.deriv_sig(z) for z in self.layers[layer_id]._coalesced_inputs()])
 
     def deriv_z_wrt_weights(self, layer_id: int) -> np.array:
         """
@@ -423,8 +423,8 @@ class Network():
 
 class RandomUtils():
     def __init__(self, seed: int):
-        R = Random()
-        R.seed(seed)
+        self.R = Random()
+        self.R.seed(seed)
 
     def tan_random_float(self) -> np.float32: 
         return (lambda x: tan(2.*pi*(x - 0.5)))(self.R.random())

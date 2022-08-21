@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 from random import Random
 import sys
@@ -11,17 +12,12 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-
-from network import random_array
-
-
-
+from network import RandomUtils
 
 start_time = time.process_time()
+ru = RandomUtils(1234)
 
 ### Construct example
-R = Random()
-R.seed(1234)
 input_values = np.array([-8., 72.0, 0.26])
 label_values = np.array([0.6, 0.2])
 example = {'features': input_values,
@@ -29,7 +25,7 @@ example = {'features': input_values,
 
 ### Construct network
 layer_sizes = (3,5,2)
-network = nwk.Network(layer_sizes)
+network = nwk.Network(layer_sizes, ru.random_array)
 
 learning_rate = 0.01
 
@@ -37,20 +33,10 @@ learning_rate = 0.01
 network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
-
-deltas_new = network.compute_delta_weights_and_biases(example['features'], learning_rate)
-deltas_old = network.compute_delta_weights_and_biases__old(example['features'], learning_rate)
-
-for (nw,nb),(ow,ob) in zip(deltas_new, deltas_old):
-    print(nb)
-    print(ob)
-
-
-
-# for iteration in range(1, 100):
-#     print(f'iteration {iteration} --- all layers weights\' calcs:')
-#     delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
-#     network.add_delta_weights_and_biases(delta_weights_and_biases)
-#     network.print_status(iteration, example)
+for iteration in range(1, 100):
+    print(f'iteration {iteration} --- all layers weights\' calcs:')
+    delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
+    network.add_delta_weights_and_biases(delta_weights_and_biases)
+    network.print_status(iteration, example)
 
 print(time.process_time() - start_time, "seconds")
