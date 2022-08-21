@@ -4,6 +4,7 @@ from random import Random
 import numpy as np
 from math import exp, tan, pi, prod
 # from numpy.random import rand
+import time
 
 class Node():
     """
@@ -313,7 +314,7 @@ class Network():
         """
         return all_ones_array((self.layer_sizes()[layer_id],))
 
-    def _compute_back_prop_monomer_ending_at_l(self, l: int) -> np.array:
+    def _compute_back_prop_monomer_for_target_l(self, l: int) -> np.array:
         """
         Computes the pair of partial derivs that form a repeated monomer when
         calculating delta_weights and delta_biases for interior layers.
@@ -360,7 +361,7 @@ class Network():
         #       propagate to an internal layer. Just lay down the results for 
         #       each layer in a single go.
         for l in range(output_layer_id-1, target_layer_id-1, -1):
-            chain_of_partials.append(self._compute_back_prop_monomer_ending_at_l(l).T)
+            chain_of_partials.append(self._compute_back_prop_monomer_for_target_l(l).T)
 
         # === Weld the chain - by applying the dot product ===
         if len(chain_of_partials) > 1:
@@ -374,20 +375,56 @@ class Network():
                 chained_partials.T)
 
 
-    def compute_delta_weights_and_biases(self, labels: np.array, learning_rate: np.float32) -> list:
+    def compute_delta_weights_and_biases__old(self, labels: np.array, learning_rate: np.float32) -> list:
         """
-        Computes delta_weights for all layers, excluding the 0th, of course.
+        Computes delta_weights_and_biases for all layers, excluding the 0th.
 
         labels: np.array - ground truth values for output
         learning_rate: np.float32 - arbitrary coefficient for delta_biases
         
-        returns a list of matrices
+        returns a list of tuples of matrices
         """
         output_layer_id = len(self.layer_sizes()) - 1
         result = [(None, None)]
         for l in range(1, output_layer_id+1):
             result.append(tuple(map(lambda x: -learning_rate * x, self._compute_delta_weights_and_biases_at_layer_l(l, labels))))
         return result
+
+
+
+    def compute_delta_weights_and_biases(self, labels: np.array, learning_rate: np.float32) -> list:
+        """
+        Computes delta_weights_and_biases for all layers, excluding the 0th.
+
+        labels: np.array - ground truth values for output
+        learning_rate: np.float32 - arbitrary coefficient for delta_biases
+        
+        returns a list of tuples of matrices
+        """
+        f = len(self.layer_sizes()) - 1
+        start_monomer = self.deriv_Cost_wrt_a_output(labels, self.outputs()) * self.deriv_a_wrt_z(f)
+        delta_biases = [start_monomer]
+        # delta_weights only differs from delta_biases by the final 
+        # deriv_z_wrt_weights(l) term, see below. We start by assembling 
+        # delta_biases and then apply the weights term at the end. No such 
+        # suffix is required for bias deltas.
+        for l in range(f-1, 0, -1):
+            # Prepend next monomer
+            delta_biases.insert(0,
+                np.dot(delta_biases[0], self._compute_back_prop_monomer_for_target_l(l).T)
+            )
+        # Insert an empty entry for the input (0th) layer
+        delta_biases.insert(0, np.empty(()))
+
+        delta_weights = []
+        for l, vector in enumerate(delta_biases):
+            delta_weights.append(
+                -learning_rate * np.outer(vector, self.deriv_z_wrt_weights(l)).T
+            )
+            vector *= -learning_rate
+
+        return list(zip(delta_weights, delta_biases))
+
 
 
 # ============================================
@@ -436,28 +473,40 @@ def char(C: int) -> str:
 
 
 ### ==================================================
+start_time = time.process_time()
+
 ### Construct example
 R = Random()
 R.seed(1234)
-input_values = np.array([0., -72.0, 0.26, 8.0])
-label_values = np.array([0.7, 0.2])
+input_values = np.array([-8., 72.0, 0.26])
+label_values = np.array([0.6, 0.2])
 example = {'features': input_values,
-           'labels': label_values}
+        'labels': label_values}
 
 ### Construct network
-layer_sizes = (4,3,2)
+layer_sizes = (3,5,2)
 network = Network(layer_sizes)
 
-learning_rate = 0.1
+learning_rate = 0.01
 
 ### Set inputs
 network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
-for iteration in range(1, 10):
-    print(f'iteration {iteration} --- all layers weights\' calcs:')
-    delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
-    network.add_delta_weights_and_biases(delta_weights_and_biases)
-    network.print_status(iteration, example)
+
+deltas_new = network.compute_delta_weights_and_biases(example['features'], learning_rate)
+deltas_old = network.compute_delta_weights_and_biases__old(example['features'], learning_rate)
+
+for (nw,nb),(ow,ob) in zip(deltas_new, deltas_old):
+    print(nb)
+    print(ob)
 
 
+
+# for iteration in range(1, 100):
+#     print(f'iteration {iteration} --- all layers weights\' calcs:')
+#     delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
+#     network.add_delta_weights_and_biases(delta_weights_and_biases)
+#     network.print_status(iteration, example)
+
+print(time.process_time() - start_time, "seconds")
