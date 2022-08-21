@@ -249,7 +249,7 @@ class Network():
         outs = outputs if outputs is not None else self.outputs()
         return self.layers[-1].cost(labels, outs)
         
-    def deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
+    def _deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
         """
         Computes the derivative of the cost function with respect to the 
         network's outputs.
@@ -260,7 +260,7 @@ class Network():
         outs = outputs if outputs is not None else self.outputs()
         return np.array([-((label/out) + (1. - label)/(1. - out)) for label, out in zip(labels, outs)])
 
-    def deriv_a_wrt_z(self, layer_id: int) -> np.array:
+    def _deriv_a_wrt_z(self, layer_id: int) -> np.array:
         """
         Computes the derivative of the network's outputs with respect to the 
         nodes' coalesced inputs, often denoted as 'z^l_n'.
@@ -273,7 +273,7 @@ class Network():
         """
         return np.array([Activation.deriv_sig(z) for z in self.layers[layer_id]._coalesced_inputs()])
 
-    def deriv_z_wrt_weights(self, layer_id: int) -> np.array:
+    def _deriv_z_wrt_weights(self, layer_id: int) -> np.array:
         """
         Computes the derivative of 'z^l_n' in terms of the weights, 'W^l_{m n}'
         which turns out to be nothing more than the post-activation ouputs of 
@@ -287,7 +287,7 @@ class Network():
         #### Should I add in the usual input caching check? Not for an internal layer? ####
         return self.layers[layer_id - 1].outputs()
 
-    def deriv_z_wrt_a_m1(self, layer_id: int) -> np.array:
+    def _deriv_z_wrt_a_m1(self, layer_id: int) -> np.array:
         """
         Computes the dervative of 'z^l_n' in terms of the previous layer's
         post-activation node outputs 'a^(l-1)_m' which turns out to be the 
@@ -303,12 +303,12 @@ class Network():
             result[:,n] = self.layers[layer_id].nodes[n].input_weights
         return result
 
-    def deriv_z_wrt_b(self, layer_id: int) -> np.array:
+    def _deriv_z_wrt_b(self, layer_id: int) -> np.array:
         """
         Computes the derivative of 'z^l_n' with respect to the layer's biases
         'b^l_n', which turns out to be just ones.
         """
-        return all_ones_array((self.layer_sizes()[layer_id],))
+        return ArrayUtils.all_ones_array((self.layer_sizes()[layer_id],))
 
     def _compute_back_prop_monomer_for_target_l(self, l: int) -> np.array:
         """
@@ -319,8 +319,8 @@ class Network():
             upstream target layer, not the source layer.
         """
         return np.einsum('nm,n -> nm',
-                         self.deriv_z_wrt_a_m1(l+1), 
-                         self.deriv_a_wrt_z(l), dtype=np.float32)
+                         self._deriv_z_wrt_a_m1(l+1), 
+                         self._deriv_a_wrt_z(l), dtype=np.float32)
 
     def _compute_delta_weights_and_biases_at_layer_l(self, target_layer_id: int, labels: np.array) -> tuple:
         """
@@ -349,8 +349,8 @@ class Network():
         #   This needs to be improved. We don't want to repeatedly calling outputs().
         # Initiailize the chain of matrices to be multiplied
         chain_of_partials = [np.einsum('m,m -> m',
-                                      self.deriv_Cost_wrt_a_output(labels, self.outputs()),
-                                      self.deriv_a_wrt_z(output_layer_id))]
+                                      self._deriv_Cost_wrt_a_output(labels, self.outputs()),
+                                      self._deriv_a_wrt_z(output_layer_id))]
 
         # === Insert as many monomers as needed to get back to desired layer ===
         #   Future improvement: Don't recompute each monomer everytime we back-
@@ -367,7 +367,7 @@ class Network():
 
         # The above stem applies equally well to both delta_weights and delta_biases,
         # let's use it to compute both
-        return (np.outer(chained_partials, self.deriv_z_wrt_weights(target_layer_id)).T,
+        return (np.outer(chained_partials, self._deriv_z_wrt_weights(target_layer_id)).T,
                 chained_partials.T)
 
 
@@ -398,10 +398,10 @@ class Network():
         returns a list of tuples of matrices
         """
         f = len(self.layer_sizes()) - 1
-        start_monomer = self.deriv_Cost_wrt_a_output(labels, self.outputs()) * self.deriv_a_wrt_z(f)
+        start_monomer = self._deriv_Cost_wrt_a_output(labels, self.outputs()) * self._deriv_a_wrt_z(f)
         delta_biases = [start_monomer]
         # delta_weights only differs from delta_biases by the final 
-        # deriv_z_wrt_weights(l) term, see below. We start by assembling 
+        # _deriv_z_wrt_weights(l) term, see below. We start by assembling 
         # delta_biases and then apply the weights term at the end. No such 
         # suffix is required for bias deltas.
         for l in range(f-1, 0, -1):
@@ -415,7 +415,7 @@ class Network():
         delta_weights = []
         for l, vector in enumerate(delta_biases):
             delta_weights.append(
-                -learning_rate * np.outer(vector, self.deriv_z_wrt_weights(l)).T
+                -learning_rate * np.outer(vector, self._deriv_z_wrt_weights(l)).T
             )
             vector *= -learning_rate
 
