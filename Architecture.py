@@ -35,10 +35,8 @@ class Node():
         self.input_weights = init_input_weights_1D
         self.bias = init_bias
 
-    def add_delta_bias(self, delta_bias: np.float32):
-        self.bias += delta_bias
-
-    def add_delta_weights(self, delta_weights: np.array):
+    def add_delta_weights_and_biases(self, delta_weights_and_biases: tuple):
+        delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 1,\
             'delta_weights rank must be 1, not {}'\
             .format(len(delta_weights.shape))
@@ -46,6 +44,11 @@ class Node():
             'Node: Size of previous layer, {}, must match size of delta_weights, {}.'\
             .format(self.input_layer.size(), delta_weights.shape[0])
         self.input_weights += delta_weights
+
+        delta_bias = delta_weights_and_biases[1]
+        assert np.isscalar(delta_bias),\
+            'delta_bias must be a scalar here at node level.'
+        self.bias += delta_bias
 
     def _coalesced_input(self) -> np.float32:
         """
@@ -99,9 +102,6 @@ class Layer():
             assert init_biases_1D is None,\
                 "You must not specify init_biases_1D for the input layer."
 
-
-
-
         self.input_layer = input_layer
 
         self.nodes = []
@@ -117,29 +117,29 @@ class Layer():
     def size(self) -> int:
         return len(self.nodes)
 
-    def add_delta_biases(self, delta_biases_1D: np.array):
-        assert len(delta_biases_1D.shape) == 1,\
-            'Rank of delta_biases_1D must be 1, not {}'\
-            .format(len(delta_biases_1D.shape))
-        assert delta_biases_1D.shape[0] == self.size(),\
-            'Dim of delta_biases_1D {} must equal number of nodes {}.'\
-            .format(delta_biases_1D.shape[0], self.size())
-        for n, node in enumerate(self.nodes):
-            node.add_delta_bias(delta_biases_1D[n])
-
-    def add_delta_weights(self, delta_weights: np.array):
+    def add_delta_weights_and_biases(self, delta_weights_and_biases: tuple):
+        delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 2,\
             'delta_weights rank must be 2, not {}'\
             .format(len(delta_weights.shape))
-        print(delta_weights.shape)
         assert delta_weights.shape[1] == self.size(),\
             'Number of nodes {} must match delta_weights\' 2nd extents {}'\
             .format(self.size(), delta_weights.shape[1])
         assert delta_weights.shape[0] == self.input_layer.size(),\
-            'Number of nodes in previous layer {} must match delta_weight\'s 1st extents {}'\
-            .format(delta_weights.shape[0], self.input_layer.size())
-        for idx, node in enumerate(self.nodes):
-            node.add_delta_weights(delta_weights[:,idx])
+            'Number of nodes in previous layer {} must match delta_weight\'s '\
+            +'second index extents {}'\
+            .format(self.input_layer.size(), delta_weights.shape[0])
+
+        delta_biases = delta_weights_and_biases[1]
+        assert len(delta_biases.shape) == 1,\
+            'Rank of delta_biases must be 1, not {}'\
+            .format(len(delta_biases.shape))
+        assert delta_biases.shape[0] == self.size(),\
+            'Dim of delta_biases {} must equal number of nodes {}.'\
+            .format(delta_biases.shape[0], self.size())
+
+        for n, node in enumerate(self.nodes):
+            node.add_delta_weights_and_biases((delta_weights[:, n], delta_biases[n]))
 
     def _coalesced_inputs(self) -> np.array:
         """
@@ -217,49 +217,25 @@ class Network():
         # Only apply the global_input_values to the 0th layer
         self.layers[0].global_input_values = global_input_values
 
-    def add_delta_biases(self, delta_biases_2D: list):
-        # The zeroth layer has no biases. Thus the first element of 
-        # delta_biases_2D is ignored.
-        ranks = [0 if delta_biases[l] is None else len(delta_biases[l].shape) for l in range(self.num_layers())]
-        rankish = map(lambda x: x <= 1, ranks)
-        assert all(rankish),\
-            'Each array in delta_biases_2D must be None or rank 1, not {}.'\
-            .format((len(delta_biases_2D[l].shape)))
-
-        dims = [-1 if delta_biases[l] is None else delta_biases[l].size for l in range(self.num_layers())]
-        dimish = [x == y for x,y in zip(dims, self.layer_sizes())]
-        assert all(dimish[1:]),\
-            'delta_biases_2D sizes {} must match layer sizes {}.'\
-            .format(([dims[l] for l in delta_biases_2D[1:]]), self.layer_sizes()[1:])
-        for l, layer in enumerate(self.layers):
-            if(l>=1):
-                layer.add_delta_biases(delta_biases_2D[l])
-
-    def add_delta_weights(self, delta_weights: list):
-        # The zeroth layer has no weights or biases. Thus the first element of 
-        # delta_weights is ignored.
-        assert len(delta_weights) == len(self.layers),\
-            f'Length of delta_weights {len(delta_weights)} must match number of layers {len(self.layers)}.'
-        for idx, layer_matrix in enumerate(delta_weights):
+    def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
+        # The zeroth layer has no weights or biases. Thus the 0th element of 
+        # delta_weights_and_biases is ignored.
+        assert len(delta_weights_and_biases) == self.num_layers(),\
+            f'len(delta_weights_and_biases ({len(delta_weights_and_biases)})'\
+                f'must equal num_layers ({self.num_layers()})' 
+        for idx in range(len(delta_weights_and_biases)):
             if(idx >= 1):
-                self.layers[idx].add_delta_weights(layer_matrix)
+                self.layers[idx].add_delta_weights_and_biases(delta_weights_and_biases[idx])
 
-    def random_delta_biases(self) -> list:
-        # The zeroth layer has no biases. Thus the first element of 
-        # delta_biases is left empty.
-        result = [np.empty(())]
-        for l in range(len(self.layer_sizes())):
-            if(l >= 1):
-                result.append(random_array((self.layer_sizes()[l],)))
-        return result
-
-    def random_delta_weights(self) -> list:
-        # The zeroth layer has no weights and no biase. Thus the first element of delta_weights is 
-        # left empty.
-        result = [None]
-        for idx, size in enumerate(self.layer_sizes()):
-            if(idx >= 2):
-                result.append(random_array((self.layer_sizes()[idx - 1], size)))
+    def random_delta_weights_and_biases(self) -> list:
+        # The zeroth layer has no weights or biases, thus leave the 0th element
+        # empty.
+        result = [(None, None)]
+        layer_sizes = self.layer_sizes()
+        for idx, size in enumerate(layer_sizes):
+            if(idx >= 1):
+                result.append((random_array((layer_sizes[idx - 1], size)),  
+                               random_array((size,))))
         return result
 
     # ============================
@@ -337,35 +313,6 @@ class Network():
         """
         return all_ones_array((self.layer_sizes()[layer_id],))
 
-    def compute_delta_weights_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
-        """
-        Computes delta_weights for the output layer.
-
-        labels: np.array - ground truth values for output
-        learning_rate: np.float32 - arbitrary coefficient for delta_weights
-        """
-        num_nodes_f = self.layer_sizes()[-1]
-        num_nodes_fm1 = self.layer_sizes()[-2]
-        result = np.array((num_nodes_fm1, num_nodes_f), dtype=np.float32)
-
-        return -learning_rate * np.einsum('n, n, m -> m n', 
-                                          self.deriv_Cost_wrt_a_output(labels),
-                                          self.deriv_a_wrt_z(-1),
-                                          self.deriv_z_wrt_weights(-1))
-
-    def compute_delta_biases_f_layer(self, labels: np.array, learning_rate: np.float32) -> np.array:
-        """
-        Computes delta_biases for the output layer.
-
-        labels: np.array - ground truth values for output
-        learning_rate: np.float32 - arbitrary coefficient for delta_biases
-        """
-        num_nodes_f = self.layer_sizes()[-1]
-        return -learning_rate * np.einsum('n, n, n -> n',
-                                          self.deriv_Cost_wrt_a_output(labels),
-                                          self.deriv_a_wrt_z(-1),
-                                          self.deriv_z_wrt_b(-1))
-
     def _compute_back_prop_monomer_ending_at_l(self, l: int) -> np.array:
         """
         Computes the pair of partial derivs that form a repeated monomer when
@@ -378,13 +325,15 @@ class Network():
                          self.deriv_z_wrt_a_m1(l+1), 
                          self.deriv_a_wrt_z(l), dtype=np.float32)
 
-    def _compute_delta_weights_at_layer_l(self, target_layer_id: int, labels: np.array) -> np.array:
+    def _compute_delta_weights_and_biases_at_layer_l(self, target_layer_id: int, labels: np.array) -> tuple:
         """
         Computes delta_weights for any layer, excluding the 0th, of course.
 
         target_layer_id: int - the layer number of the layer owning the target weights
         labels: np.array - ground truth values for output
         learning_rate: np.float32 - arbitrary coefficient for delta_biases
+
+        returns tuple[np.array] - where the tuple includes (delta_weights, delta_biases)
         """
         layer_sizes = self.layer_sizes()
         output_layer_id = len(layer_sizes) - 1
@@ -395,21 +344,37 @@ class Network():
         assert target_layer_id > 0 and target_layer_id <= output_layer_id,\
             f'target_layer_id must be > 0 and <= {output_layer_id}, not {target_layer_id}.'
 
+        # The business of having to transpose many individual matrices and their 
+        # product came about because I chose to index weights as W_{prior_l this_l},
+        # resulting in chains that look like M_ba M_cb M_dc etc. It would have been
+        # much cleaner had I chosen the other option. 
+
         #   This needs to be improved. We don't want to repeatedly calling outputs().
         # Initiailize the chain of matrices to be multiplied
         chain_of_partials = [np.einsum('m,m -> m',
                                       self.deriv_Cost_wrt_a_output(labels, self.outputs()),
                                       self.deriv_a_wrt_z(output_layer_id))]
+
+        # === Insert as many monomers as needed to get back to desired layer ===
+        #   Future improvement: Don't recompute each monomer everytime we back-
+        #       propagate to an internal layer. Just lay down the results for 
+        #       each layer in a single go.
         for l in range(output_layer_id-1, target_layer_id-1, -1):
             chain_of_partials.append(self._compute_back_prop_monomer_ending_at_l(l).T)
 
+        # === Weld the chain - by applying the dot product ===
         if len(chain_of_partials) > 1:
-            return np.outer(np.linalg.multi_dot(chain_of_partials), self.deriv_z_wrt_weights(target_layer_id)).T
+            chained_partials = np.linalg.multi_dot(chain_of_partials)
         else:
-            return np.outer(chain_of_partials[0], self.deriv_z_wrt_weights(target_layer_id)).T
+            chained_partials = chain_of_partials[0]
+
+        # The above stem applies equally well to both delta_weights and delta_biases,
+        # let's use it to compute both
+        return (np.outer(chained_partials, self.deriv_z_wrt_weights(target_layer_id)).T,
+                chained_partials.T)
 
 
-    def compute_delta_weights(self, labels: np.array, learning_rate: np.float32) -> list:
+    def compute_delta_weights_and_biases(self, labels: np.array, learning_rate: np.float32) -> list:
         """
         Computes delta_weights for all layers, excluding the 0th, of course.
 
@@ -419,13 +384,10 @@ class Network():
         returns a list of matrices
         """
         output_layer_id = len(self.layer_sizes()) - 1
-        result = [None]
+        result = [(None, None)]
         for l in range(1, output_layer_id+1):
-            result.append(-learning_rate * self._compute_delta_weights_at_layer_l(l, labels))
+            result.append(tuple(map(lambda x: -learning_rate * x, self._compute_delta_weights_and_biases_at_layer_l(l, labels))))
         return result
-
-
-
 
 
 # ============================================
@@ -493,16 +455,9 @@ network.adjust_global_input_values(example['features'])
 network.print_status(0, example)
 
 for iteration in range(1, 10):
-    print(f'iteration {iteration} --- final layer delta weights calcs:')
-    delta_weights = network.compute_delta_weights(example['labels'], learning_rate)
-
-    delta_biases_1 = all_zeros_array((6,))
-    delta_biases_2 = network.compute_delta_biases_f_layer(example['labels'], learning_rate)
-    delta_biases = [None, delta_biases_1, delta_biases_2]
-#    print('delta_weights_f_layer', delta_weights, delta_biases)
-
-    network.add_delta_weights(delta_weights)
-    # network.add_delta_biases(delta_biases)
+    print(f'iteration {iteration} --- all layers weights\' calcs:')
+    delta_weights_and_biases = network.compute_delta_weights_and_biases(example['labels'], learning_rate)
+    network.add_delta_weights_and_biases(delta_weights_and_biases)
     network.print_status(iteration, example)
 
 
