@@ -192,7 +192,23 @@ In general we have
 \end{align}
 which is a matrix. Were we to choose to target layer $f-3$ we anticate that we would have to insert three of these monomers, one targeting layer $f-1$, the next targeting layer $f-2$ and the third targeting layer $f-3$. Not only that but the delta biases for the previous target layer provides the starting point for this target layer. Between any two adjacent layers we need only perform a single matrix multiplication.
 
+The general formula for delta biases for arbitrary layer $l$ is
+\begin{align}
+    \label{eqn:deltaBiases}
+    \Delta \bld{b}^l = -\alpha {\left( \parpar{\cC}{\bld{a}^f} \times g'(\bld{z}^f) \right) \
+        \prod_{k = f-1}^l {\left( \bld{W}^k \times g'(\bld{z}^k) \right)}^T}
+\end{align}
+where, unless denoted $\times$ or $\otimes$, multiplication is standard matrix multiplication. The delta weights is very similar.
+\begin{align}
+    \label{eqn:deltaWeights}
+    \Delta \bld{W}^l = {\left( \left( \parpar{\cC}{\bld{a}^f} \times g'(\bld{z}^f) \right) \
+        \prod_{k = f-1}^l {\left( \bld{W}^k \times g'(\bld{z}^k) \right)}^T \otimes \bld{a}^{l-1} \right)}^T
+\end{align}
+These are the two equations required for back-propagation. 
+
 \section{Implementation Notes}
+We have expressed eqns. (\ref{eqn:deltaBiases}) and (\ref{eqn:deltaWeights}) in terms of matrix operations rather than in our preferred component notation because the implementation is simpler.
+
 Note that we a poor choice for the indexing of $W^l_{b a}$. The motivation was that the first index, in this case $b$, would enumerate the prior layer's nodes and the second index, $a$, this layer's nodes. At the time this seemed reasonable enough. Unfortunately it winds requiring each monomer to be transposed before it can be applied. It would have been cleaner to have chosen $W^l_{a b}$.
 
 \end{document}
