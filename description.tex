@@ -1,0 +1,94 @@
+\documentclass[twocolumn]{revtex4-1}
+
+% preamble
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{ulem}
+\usepackage{amsfonts}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{physics}
+\usepackage[mathscr]{euscript}
+
+\raggedbottom
+\newcommand{\ud}{\, \text{d}}
+\newcommand{\code}[1]{\textcolor{blue}{\lstinline{#1}}}
+\newcommand{\bld}[1]{\vectorbold{#1}}
+
+\begin{document}
+
+\title{Poorly Vectorized Neural Network Implementation With Back-Propagation}
+\author{Keith D. Matthews}
+\affiliation{Acerbic Associates}
+
+\date{21 August 2022}
+
+\begin{abstract}
+In the pursuit of a thorough understanding of the basic principles behind neural networks I thought I'd better construct a library from scratch. This document describes the design of that library, worts and all.
+\end{abstract}
+
+\maketitle
+
+% ======================================
+
+\section{Notation and Eqns of Forward-Propagation}
+
+The network stores a list of layers, $\textbf{L}$, which in turn store a list of nodes $\textbf{N}$. When the network's output is queried with \code{output()} this in turn calls \code{output()} at the list level, and then, in turn, at the node level. The pre-activation output (AKA the 'coalesced input') of node $m$ on layer $l$ is obtained from
+
+\begin{align}
+    \label{eqn:coalescence}
+    \bld{z}^l = \bld{W}^l \, \bld{a}^{l - 1} + \bld{b}^l
+\end{align}
+
+$\bld{a}^{l - 1}$ are the post-activation outputs of the immediately upstream (prior) layer, $l-1$. $\bld{W}^l$ are the weights connecting those outputs of layer $l - 1$ to the inputs of layer $l$. (Note that $\bld{W}^l$ is associated with layer $l$ and not with layer $l-1$.) These weights are expressed as a matrix, $W^l_{b a}$ where $b$ indexes the previous layer's nodes, while $a$ indexes the current layer's nodes. Similarly $\bld{b}^l$ are the biases for each of the nodes in layer $l$ and is well expressed as a vector, $b^l_a$, with one component for node in layer $l$. At the node level biases are scalars while weights are vectors.
+
+With this understanding of the rank of each of these objects, and how it relates the granularity (or level) we may express (\ref{eqn:coalescence}) in component notation.
+
+\begin{align}
+    \label{eqn:componentCoalescence}
+    z^l_m = W^l_{n m} \, a^{l - 1}_n + b^{l}_m
+\end{align}
+
+The input layer, where $l = 0$, is denoted $\bld{L}^0$ and is special in that it has no weights or biases associated with it.
+
+The relationship between the nodes' activation outputs, $\bld{a}^l$ and their coalesced inputs, $\bld{z}^l$ is described by
+\begin{align}
+    \label{eqn:activation}
+    \bld{a}^l = g(\bld{z}^l)
+\end{align}
+where $g$ is called the activation function. $g$ does not mix components the way $\bld{W}$ does, instead it acts like a scalar treating each of the components of its input independently. In component notation we have
+\begin{align}
+    a^l_n = g(z^l_n)
+\end{align}
+Together eqns (\ref{eqn:coalescence}) and (\ref{eqn:activation}) can be used to bootstrap from layer to layer until the network's output is computed. By taking derivatives of these, and a cost function, we will derive back-propagation.
+
+\section{Training Data}
+The \textit{predictions} (network level outputs) of the network are denoted $\bld{y}$ while the inputs (\textit{examples}) are denoted $\bld{x}$. Training data is composed of examples labeled with known ground truth outputs denoted $\bld{\hat{y}}$. We identify the predictions $y_m$ with the activation values $a^f_m = y_m$ when the inputs are $z^0_n = x_n$ set to the example values. With those definitions we may define the cross-entropy cost function, denoted $\mathscr{C}$, that scores the predictions according to how closely they match the ground truth.
+
+\begin{align}
+    \label{eqn:costDefn}
+    \mathscr{C} \equiv - \left(y \ln \hat{y} + (1 - y) \ln (1 - \hat{y}) \right)
+\end{align}
+The idea is that the greater the gap between the predicted outputs and ground truth the higher the score. By adjusting the weights and biases we hope to minimize the cost and thereby bring the predicted outputs in alignment with the ground truth. This process is known as \textit{training} the network. There are myriad cost functions and we're told that some work better in some circumstances, etc. but for this document I'm only going to employ the cross-entropy cost.
+
+\subsection{Testing Vs. Training Data}
+Most researches will take a portion of their data set and set it aside to insure that it will not be used for training the model. This data is then available to test how well the model performs on data it has not seen before. This set aside is known as a \textit{test dataset}. The term \textit{training data} refers to the majority of the original data set that is available to train the model.
+
+\section{Back-Propagation}
+Now we have all the pieces in place to discuss back-propagation, an algorithm for refining ours weights and biases to iteratively reduce the overall cost of our training set. 
+
+\begin{align}
+    \label{eqn:deltas}
+    \Delta \bld{W} & \approx - \alpha \frac{\partial \mathscr{C}}{\partial \bld{W}} \\
+    %
+    \Delta \bld{b} & \approx - \alpha \frac{\partial \mathscr{C}}{\partial \bld{b}}
+\end{align}
+We may imagine these equations as the first order terms in Taylor expansions of the Cost function in terms of our weights and biases, and interpret our efforts as computing first order approximations to the platonic $\Delta$'s. 
+
+
+
+
+
+(Note that I wouldn't make this choice for indexing $\bld{W}$ if I were doing it again. It works well for forward propoagation and requires lots of transposing for back-propagation.) 
+
+\end{document}
