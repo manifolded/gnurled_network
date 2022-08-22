@@ -1,64 +1,6 @@
 from random import Random
 import numpy as np
 from math import exp, tan, pi, prod, log
-
-class Node():
-    """
-    Nodes are the vertices in the network. They provide a minimal unit of 
-    computation. Nodes are combined to make layers, see class Layers for 
-    more detail. 
-
-    The outputs of the nodes of the layer immediately upstream provide
-    each node's inputs. These inputs are weighted before being combined into a 
-    single output scalar. 
-
-    By design nodes own the weights for their connections with the nodes of the 
-    directly upstream layer. They do not own the weights for their downstream 
-    connections which are owned instead for the nodes of the next layer.
-    """
-    def __init__(self, init_input_weights_1D: np.array, init_bias: np.float32, input_layer):
-        if input_layer is not None:
-            assert(input_layer.size() > 0)
-            # init_input_weights_1D must be 1D for a simple node
-            assert(init_input_weights_1D.shape == (input_layer.size(), 1) or \
-                    init_input_weights_1D.shape == (input_layer.size(), ))
-        else:
-            assert init_input_weights_1D is None,\
-                "You must not specify init_input_weights_1D for the input layer."
-            assert init_bias is None,\
-                "You must not specify init_bias for the input layer."
-            
-        self.input_layer = input_layer
-        self.input_weights = init_input_weights_1D
-        self.bias = init_bias
-
-    def add_delta_weights_and_biases(self, delta_weights_and_biases: tuple):
-        delta_weights = delta_weights_and_biases[0]
-        assert len(delta_weights.shape) == 1,\
-            'delta_weights rank must be 1, not {}'\
-            .format(len(delta_weights.shape))
-        assert delta_weights.shape[0] == self.input_layer.size(),\
-            'Node: Size of previous layer, {}, must match size of delta_weights, {}.'\
-            .format(self.input_layer.size(), delta_weights.shape[0])
-        self.input_weights += delta_weights
-
-        delta_bias = delta_weights_and_biases[1]
-        assert np.isscalar(delta_bias),\
-            'delta_bias must be a scalar here at node level.'
-        self.bias += delta_bias
-
-    def _coalesced_input(self) -> np.float32:
-        """
-        Returns the 'pre-activation output' aka 'coalesced input' of this 
-        node.
-        """
-        assert self.input_layer is not None,\
-            '_coalesced_input cannot be called on the input layer, yet self.input_layer was None.'
-        return sum(map(lambda x,y: x*y, self.input_weights, self.input_layer.outputs())) + self.bias
-
-    def output(self) -> np.float32:
-        return Activation.sigmoid(self._coalesced_input())
-
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
@@ -81,7 +23,7 @@ class Layer():
 
         if input_layer is not None:
             assert(len(init_input_weights_2D.shape) == 2)
-            assert init_input_weights_2D.shape == (input_layer.size(), size),\
+            assert init_input_weights_2D.shape == (input_layer.size, size),\
                 'init_input_weights_2D must be a matrix of dimension ({}, {}) not {}!'\
                 .format(input_layer.size(), size, init_input_weights_2D.shape)
             assert init_biases_1D.shape == (size,),\
@@ -93,30 +35,24 @@ class Layer():
             assert init_biases_1D is None,\
                 "You must not specify init_biases_1D for the input layer."
 
+        self.size = size
         self.input_layer = input_layer
-
-        self.nodes = []
-        if input_layer is not None:
-            for n in range(size):
-                self.nodes.append(Node(init_input_weights_2D[:,n], init_biases_1D[n], input_layer))
-        else:
-            for n in range(size):
-                self.nodes.append(Node(None, None, None))
-
+        self.input_weights = init_input_weights_2D
+        self.biases = init_biases_1D
         self.global_input_values = None
 
     def size(self) -> int:
-        return len(self.nodes)
+        return self.size
 
     def add_delta_weights_and_biases(self, delta_weights_and_biases: tuple):
         delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 2,\
             'delta_weights rank must be 2, not {}'\
             .format(len(delta_weights.shape))
-        assert delta_weights.shape[1] == self.size(),\
+        assert delta_weights.shape[1] == self.size,\
             'Number of nodes {} must match delta_weights\' 2nd extents {}'\
             .format(self.size(), delta_weights.shape[1])
-        assert delta_weights.shape[0] == self.input_layer.size(),\
+        assert delta_weights.shape[0] == self.input_layer.size,\
             'Number of nodes in previous layer {} must match delta_weight\'s '\
             +'second index extents {}'\
             .format(self.input_layer.size(), delta_weights.shape[0])
@@ -125,30 +61,24 @@ class Layer():
         assert len(delta_biases.shape) == 1,\
             'Rank of delta_biases must be 1, not {}'\
             .format(len(delta_biases.shape))
-        assert delta_biases.shape[0] == self.size(),\
+        assert delta_biases.shape[0] == self.size,\
             'Dim of delta_biases {} must equal number of nodes {}.'\
-            .format(delta_biases.shape[0], self.size())
+            .format(delta_biases.shape[0], self.size)
 
-        for n, node in enumerate(self.nodes):
-            node.add_delta_weights_and_biases((delta_weights[:, n], delta_biases[n]))
-
+        self.input_weights += delta_weights
+        self.biases += delta_biases
+        
     def _coalesced_inputs(self) -> np.array:
         """
         Returns an array of the 'pre-activation outputs' aka 'coalesced 
         inputs' of the nodes in this layer.
         """
-        if self.input_layer is not None:
-            return np.array([n._coalesced_input() for n in self.nodes])
-        else:
-            return self.global_input_values
+        return self.global_input_values if self.input_layer is None else \
+            np.dot(self.input_weights.T, self.input_layer.outputs()) + self.biases
 
-    def outputs(self) -> list[np.float32]:
-        if self.input_layer is None:
-            # Forget the nodes and just compute the layer output array directly
-            return np.vectorize(Activation.sigmoid)(self.global_input_values)
-        else:
-            # Doesn't this seem clunky and possibly slow?
-            return np.array([node.output() for node in self.nodes])
+
+    def outputs(self) -> np.array:
+        return np.vectorize(Activation.sigmoid)(self._coalesced_inputs())
 
 class Network():
     """
@@ -159,7 +89,7 @@ class Network():
         assert all([size > 0 for size in layer_sizes])
 
         self.cost_implementation = cost_implementation
-        
+
         self.layers = []
         # Insert Layer 0
         self.layers.append(Layer(layer_sizes[0], 
@@ -176,7 +106,7 @@ class Network():
                                          self.layers[idx - 1]))
 
     def layer_sizes(self) -> tuple:
-        layer_sizes = [layer.size() for layer in self.layers]
+        layer_sizes = [layer.size for layer in self.layers]
         return tuple(layer_sizes)
 
     def num_layers(self) -> int:
@@ -282,12 +212,7 @@ class Network():
         layer_id: int - 'l', which indicates to which layer these quantities 
             belong
         """        
-        num_nodes_l = self.layer_sizes()[layer_id]
-        num_nodes_lm1 = self.layer_sizes()[layer_id - 1]
-        result = np.empty((num_nodes_lm1, num_nodes_l), dtype=np.float32)
-        for n in range(num_nodes_l):
-            result[:,n] = self.layers[layer_id].nodes[n].input_weights
-        return result
+        return self.layers[layer_id].input_weights
 
     def _deriv_z_wrt_b(self, layer_id: int) -> np.array:
         """
@@ -306,7 +231,7 @@ class Network():
         """
         return np.einsum('nm,n -> nm',
                          self._deriv_z_wrt_a_m1(l+1), 
-                         self._deriv_a_wrt_z(l), dtype=np.float32)
+                         self._deriv_a_wrt_z(l))
 
     def compute_delta_weights_and_biases(self, labels: np.array, learning_rate: np.float32) -> list:
         """
@@ -378,7 +303,7 @@ class Activation():
         return 1./(1. + exp(- input))
 
     def deriv_sig(input: np.float32) -> np.float32:
-        emx:np.float64 = exp(-input)
+        emx:np.float32 = exp(-input)
         assert emx > 0.,\
             f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
         return np.float32(- emx/((1. + emx)*(1. + emx)))
