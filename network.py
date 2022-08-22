@@ -1,6 +1,6 @@
 from random import Random
 import numpy as np
-from math import exp, tan, pi, prod
+from math import exp, tan, pi, prod, log
 
 class Node():
     """
@@ -58,12 +58,6 @@ class Node():
 
     def output(self) -> np.float32:
         return Activation.sigmoid(self._coalesced_input())
-
-    def cost(self, label: np.float32, output: np.float32 = None) -> np.float32:
-        # Avoid unnecessarily recomputing output by passing as arg
-        out = output if output is not None else self.output()
-        delta = label - out
-        return delta * delta
 
 class Layer():
     """
@@ -156,24 +150,16 @@ class Layer():
             # Doesn't this seem clunky and possibly slow?
             return np.array([node.output() for node in self.nodes])
 
-    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
-        assert len(labels.shape) == 1,\
-            'Labels rank must be 1, not {}'.format(len(labels.shape))
-        assert labels.shape[0] == self.size(),\
-            'Labels must have the same number of elements {} as there are nodes in this layer {}.'\
-            .format(labels.shape[0], self.size())
-        # Avoid unnecessarily recomputing output by passing as arg
-        outs = outputs if outputs is not None else self.outputs()
-        return sum([node.cost(labels[n], outs[n]) for n, node in enumerate(self.nodes)])
-
 class Network():
     """
     Holds the list of Layers that defines the network. Also provides convenient
     initialization and update methods.
     """
-    def __init__(self, layer_sizes: tuple, array_generator):
+    def __init__(self, layer_sizes: tuple, array_generator: callable, cost_implementation: callable):
         assert all([size > 0 for size in layer_sizes])
 
+        self.cost_implementation = cost_implementation
+        
         self.layers = []
         # Insert Layer 0
         self.layers.append(Layer(layer_sizes[0], 
@@ -199,10 +185,10 @@ class Network():
     def outputs(self) -> np.array:
         return self.layers[-1].outputs()
 
-    def print_status(self, i: int, example: dict):
+    def print_status(self, iteration: int, example: list):
         result = self.outputs()
-        cost = self.cost(example['labels'], result)
-        print(i, result, cost)
+        cost = self.cost(example[1], result)
+        print(iteration, result, cost)
 
     def adjust_global_input_values(self, global_input_values: np.array):
         assert len(global_input_values.shape) == 1,\
@@ -247,7 +233,7 @@ class Network():
 
         # Avoid recomputing the outputs by passing in the value with the 2nd argument
         outs = outputs if outputs is not None else self.outputs()
-        return self.layers[-1].cost(labels, outs)
+        return self.cost_implementation.cost(labels, outs)
         
     def _deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
         """
@@ -258,7 +244,7 @@ class Network():
         outputs: np.array - the network's prediction
         """
         outs = outputs if outputs is not None else self.outputs()
-        return np.array([-((label/out) + (1. - label)/(1. - out)) for label, out in zip(labels, outs)])
+        return self.cost_implementation.cost_deriv(labels, outs)
 
     def _deriv_a_wrt_z(self, layer_id: int) -> np.array:
         """
@@ -360,6 +346,9 @@ class RandomUtils():
         self.R = Random()
         self.R.seed(seed)
 
+    def random(self) -> np.float32:
+        return self.R.random()
+
     def tan_random_float(self) -> np.float32: 
         return (lambda x: tan(2.*pi*(x - 0.5)))(self.R.random())
 
@@ -393,3 +382,17 @@ class Activation():
         assert emx > 0.,\
             f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
         return np.float32(- emx/((1. + emx)*(1. + emx)))
+
+class CrossEntropyImpl():
+    def cost(labels: np.array, predictions: np.array) -> np.float32:
+        assert len(labels.shape) == len(predictions.shape) == 1
+        assert labels.shape[0] == predictions.shape[0]
+
+        vlog = np.vectorize(log)
+        return - np.sum(np.dot(labels, vlog(predictions)) + np.dot((1. - labels), vlog(1. - predictions)))
+
+    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert len(labels.shape) == len(predictions.shape) == 1
+        assert labels.shape[0] == predictions.shape[0]
+
+        return - (labels/predictions + (1. - labels)/(1. - predictions))

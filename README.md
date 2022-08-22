@@ -21,15 +21,19 @@ want to get this one working first.
     [x] Add class Network
         - To help simplify assembly of a typical network
     [x] Add add_delta_weights
-    [ ] Add back-propagation algorithm
-    [ ] Convert calcs implementation to matrix mult
+    [x] Add back-propagation algorithm
+    [x] Convert calcs implementation to matrix mult
         - Current implementation fails to vectorize
     [ ] Figure out how to declare the type Layer on input argument
-    [ ] Why can't a class take itself as an argument in its constructor?
+        - Why can't a class take itself as an argument in its constructor?
     [x] Implement random initialization for weights and biases
     [x] Convert this list to md checklist
-    [ ] Incorporate learning rate in add_delta_weights
+    [x] Incorporate learning rate in add_delta_weights
     [x] Implement add_delta_biases()
     [x] Implement cost functions at every level
     [ ] Figure out how to store outputs so they don't need to be recomputed all the time
-
+    [ ] Remove Node() class
+    [ ] Evaluate cost on all examples every time
+    [ ] Convert forward-prop to matrix mult
+    [ ] Review new cost_func argument to insure it is used comprehensively
+    
