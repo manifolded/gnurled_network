@@ -53,19 +53,21 @@ for e,example in enumerate(training):
 layer_sizes = (4,5,3)
 network = nwk.Network(layer_sizes, ru.random_array, CrossEntropyImpl)
 
-training_predictions = network.outputs(training_instances)
+# training_predictions = network.outputs(training_instances)
 # print(training_predictions)
 
-print(network.cost_M(training_labels, training_predictions))
+### print(network.cost_M(training_labels, training_predictions))
 
-# learning_rate = 0.1
+learning_rate = 0.1
 
-# for e, example in enumerate(training):
-#     print(f'iteration {e}')
-#     network.adjust_global_input_values(example[0])
-#     print(CrossEntropyImpl.cost(example[1], network.outputs()))
-#     delta_weights_and_biases = network.compute_delta_weights_and_biases(example[1], learning_rate)
-#     network.add_delta_weights_and_biases(delta_weights_and_biases)
-#     network.print_status(e, example)
+for e, example in enumerate(training):
+    print(f'iteration {e}')
+    instance = example[0]
+    label = example[1]
+    prediction = network.outputs(instance)
+    print(network.cost_M(label, prediction))
+    delta_weights_and_biases = network.compute_delta_weights_and_biases(label, learning_rate)
+    network.add_delta_weights_and_biases(delta_weights_and_biases)
+#    network.print_status(e, example)
 
 print(time.process_time() - start_time, "seconds")

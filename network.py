@@ -75,7 +75,13 @@ class Layer():
         result = input_values
         if self.input_layer != None:
             result = np.dot(self.input_weights.T, self.input_layer.outputs(input_values))
-            broad_biases = np.broadcast_to(np.expand_dims(self.biases, axis=-1), result.shape)
+ 
+            broad_biases = self.biases
+            if len(broad_biases.shape) == 1 and len(result.shape) > 1:
+                broad_biases = np.expand_dims(self.biases, axis=-1)
+
+            print(broad_biases.shape, result.shape)
+
             result +=  broad_biases
         return result
 
@@ -159,10 +165,11 @@ class Network():
         
 
     def cost_M(self, labels: np.array, outputs: np.array) -> np.array:
-        assert len(labels.shape) == len(outputs.shape) == 2
+        assert len(labels.shape) == len(outputs.shape)
         final_layer_size = self.layer_sizes()[-1]
         assert labels.shape[0] == outputs.shape[0] == final_layer_size
-        assert labels.shape[1] == outputs.shape[1]
+        if len(labels.shape) > 1:
+            assert labels.shape[1] == outputs.shape[1] 
 
         return self.cost_implementation.cost_M(labels, outputs)
 
@@ -325,10 +332,18 @@ class CrossEntropyImpl():
         return - (labels/predictions + (1. - labels)/(1. - predictions))
 
     def cost_M(labels: np.array, predictions: np.array) -> np.array:
+        # Check if arguments are rank 1, and if so harmlessly expand them.
+        lbls = labels
+        if len(lbls.shape) == 1:
+            lbls = np.expand_dims(labels, axis=-1)
+        prds = predictions
+        if len(prds.shape) == 1:
+            prds = np.expand_dims(predictions, axis=-1)
+
         vlog = np.vectorize(log)
-        num_examples = labels.shape[1]
+        num_examples = lbls.shape[1]
         result = 0.0
         for m in range(num_examples):
-            result += np.dot(labels[:,m], vlog(predictions[:,m])) +\
-                np.dot((1. - labels[:,m]), vlog(1. - predictions[:,m]))
+            result += np.dot(lbls[:,m], vlog(prds[:,m])) +\
+                np.dot((1. - lbls[:,m]), vlog(1. - prds[:,m]))
         return result/(-1.*num_examples)
