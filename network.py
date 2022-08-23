@@ -306,8 +306,11 @@ class Activation():
         deriv_sigmoid_func = np.vectorize(lambda emx: - emx/((1. + emx)*(1. + emx)))
         return deriv_sigmoid_func(exp_mx_func(input))
 
-class CrossEntropyImpl():
+class BinaryCrossEntropy():
     def cost(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape[0] == predictions.shape[0] == 1,\
+            'Binary Cross Entropy only works for 1 output.'
+
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels
         if len(lbls.shape) == 1:
@@ -318,13 +321,50 @@ class CrossEntropyImpl():
 
         vlog = np.vectorize(log)
         num_examples = lbls.shape[1]
-        result = 0.0
-        for m in range(num_examples):
-            result += np.dot(lbls[:,m], vlog(prds[:,m])) +\
-                np.dot((1. - lbls[:,m]), vlog(1. - prds[:,m]))
-        return result/(-1.*num_examples)
+        return np.dot(lbls[0,:], vlog(prds[0,:])) +\
+            np.dot((1. - lbls[0,:]), vlog(1. - prds[0,:])) / num_examples
 
     def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape[0] == predictions.shape[0] == 1,\
+            'Binary Cross Entropy only works for 1 output.'
+
+        # Check if arguments are rank 1, and if so harmlessly expand them.
+        lbls = labels
+        if len(lbls.shape) == 1:
+            lbls = np.expand_dims(labels, axis=-1)
+        prds = predictions
+        if len(prds.shape) == 1:
+            prds = np.expand_dims(predictions, axis=-1)
+
+        assert len(lbls.shape) == len(prds.shape) <= 2
+        assert lbls.shape == prds.shape
+        return (lbls/prds + (1. - lbls)/(1. - prds))*-1.
+
+class CategoricalCrossEntropy():
+    def cost(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape,\
+            'labels and predictions must be arrays of the same shape.'
+
+        # Check if arguments are rank 1, and if so harmlessly expand them.
+        lbls = labels
+        if len(lbls.shape) == 1:
+            lbls = np.expand_dims(labels, axis=-1)
+        prds = predictions
+        if len(prds.shape) == 1:
+            prds = np.expand_dims(predictions, axis=-1)
+
+        vlog = np.vectorize(log)
+        num_outputs, num_examples = lbls.shape
+        result = 0.0
+        for p in range(num_outputs):        
+            result += np.dot(lbls[p,:], vlog(prds[p,:]).T)
+        result /= -num_examples
+        return result
+
+    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape,\
+            'labels and predictions must be arrays of the same shape.'
+
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels
         if len(lbls.shape) == 1:
@@ -336,8 +376,9 @@ class CrossEntropyImpl():
         assert len(lbls.shape) == len(prds.shape) <= 2
         assert lbls.shape[0] == prds.shape[0]
         assert lbls.shape[1] == prds.shape[1]
+        _, num_examples = lbls.shape
 
-        return - (labels/predictions + (1. - labels)/(1. - predictions))
+        return np.sum(lbls/prds, axis=-1) / -num_examples
 
 class MeanVarianceConditioner():
     def __init__(self, instances: np.array):

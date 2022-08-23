@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-#from random import Random
 from sklearn.datasets import load_iris
-import random
 import sys
 import os
 import time
@@ -14,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from network import CrossEntropyImpl, MeanVarianceConditioner, InstanceLabelZipper
+from network import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -47,12 +45,9 @@ training_cond_instances, training_labels = InstanceLabelZipper.unzipper(num_feat
 
 ### Construct network
 layer_sizes = (4,5,3)
-network = nwk.Network(layer_sizes, rng.standard_normal, CrossEntropyImpl)
+network = nwk.Network(layer_sizes, rng.standard_normal, CategoricalCrossEntropy)
 
-training_predictions = network.outputs(training_cond_instances)
-# print(training_predictions)
-
-print(network.cost(training_labels, training_predictions))
+print(network.cost(training_labels, network.outputs(training_cond_instances)))
 
 learning_rate = 0.03
 
