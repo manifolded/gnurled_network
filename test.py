@@ -53,15 +53,10 @@ for e,example in enumerate(training):
 layer_sizes = (4,5,3)
 network = nwk.Network(layer_sizes, ru.random_array, CrossEntropyImpl)
 
-training_predictions = network.outputs(training_instances[:,0:2])
+training_predictions = network.outputs(training_instances)
 # print(training_predictions)
 
-
-# training_predictions = network.outputs(training_instances)
-
-# print(training_predictions)
-
-# print(network.cost_M(training_labels, training_predictions))
+print(network.cost_M(training_labels, training_predictions))
 
 # learning_rate = 0.1
 

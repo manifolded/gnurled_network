@@ -122,16 +122,6 @@ class Network():
         cost = self.cost(example[1], result)
         print(iteration, result, cost)
 
-    # def adjust_global_input_values(self, global_input_values: np.array):
-    #     assert len(global_input_values.shape) == 1,\
-    #         f"global_input_values' rank must be 1 not ({len(global_input_values.shape)})."
-    #     layer_sizes = self.layer_sizes()
-    #     assert layer_sizes[0] == global_input_values.size,\
-    #         f'Network(): global_input_values size ({global_input_values.size})'\
-    #         +'does not match layer 0 spec size ({layer_sizes[0]}).'
-    #     # Only apply the global_input_values to the 0th layer
-    #     self.layers[0].global_input_values = global_input_values
-
     def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
         # The zeroth layer has no weights or biases. Thus the 0th element of 
         # delta_weights_and_biases is ignored.
@@ -335,4 +325,10 @@ class CrossEntropyImpl():
         return - (labels/predictions + (1. - labels)/(1. - predictions))
 
     def cost_M(labels: np.array, predictions: np.array) -> np.array:
-        return 1. - predictions
+        vlog = np.vectorize(log)
+        num_examples = labels.shape[1]
+        result = 0.0
+        for m in range(num_examples):
+            result += np.dot(labels[:,m], vlog(predictions[:,m])) +\
+                np.dot((1. - labels[:,m]), vlog(1. - predictions[:,m]))
+        return result/(-1.*num_examples)
