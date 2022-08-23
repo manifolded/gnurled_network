@@ -37,18 +37,40 @@ random.shuffle(examples, ru.random)
 training = examples[:119]
 test = examples[120:]
 
+# print(f'training[0:1]: {training[0:1]}')
+
+# training is a list of tuples (pairs) of arrays
+training_instances = np.empty((4, len(training)), dtype=np.float32)
+training_labels = np.empty((3, len(training)), dtype=np.float32)
+for e,example in enumerate(training):
+    training_instances[:,e] = example[0][:]
+    training_labels[:,e] = example[1][:]
+
+# print(f'training_instances: {training_instances}')
+# print(f'training_labels: {training_labels}')
+
 ### Construct network
 layer_sizes = (4,5,3)
 network = nwk.Network(layer_sizes, ru.random_array, CrossEntropyImpl)
 
-learning_rate = 0.1
+training_predictions = network.outputs(training_instances[:,0:2])
+# print(training_predictions)
 
-for e, example in enumerate(training):
-    print(f'iteration {e}')
-    network.adjust_global_input_values(example[0])
-    print(CrossEntropyImpl.cost(example[1], network.outputs()))
-    delta_weights_and_biases = network.compute_delta_weights_and_biases(example[1], learning_rate)
-    network.add_delta_weights_and_biases(delta_weights_and_biases)
-    network.print_status(e, example)
+
+# training_predictions = network.outputs(training_instances)
+
+# print(training_predictions)
+
+# print(network.cost_M(training_labels, training_predictions))
+
+# learning_rate = 0.1
+
+# for e, example in enumerate(training):
+#     print(f'iteration {e}')
+#     network.adjust_global_input_values(example[0])
+#     print(CrossEntropyImpl.cost(example[1], network.outputs()))
+#     delta_weights_and_biases = network.compute_delta_weights_and_biases(example[1], learning_rate)
+#     network.add_delta_weights_and_biases(delta_weights_and_biases)
+#     network.print_status(e, example)
 
 print(time.process_time() - start_time, "seconds")

@@ -34,6 +34,6 @@ want to get this one working first.
     [ ] Figure out how to store outputs so they don't need to be recomputed all the time
     [ ] Remove Node() class
     [ ] Evaluate cost on all examples every time
-    [ ] Convert forward-prop to matrix mult
+    [x] Convert forward-prop to matrix mult
     [ ] Review new cost_func argument to insure it is used comprehensively
     

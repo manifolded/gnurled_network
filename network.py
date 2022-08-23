@@ -39,7 +39,6 @@ class Layer():
         self.input_layer = input_layer
         self.input_weights = init_input_weights_2D
         self.biases = init_biases_1D
-        self.global_input_values = None
 
     def size(self) -> int:
         return self.size
@@ -68,17 +67,20 @@ class Layer():
         self.input_weights += delta_weights
         self.biases += delta_biases
         
-    def _coalesced_inputs(self) -> np.array:
+    def _coalesced_inputs(self, input_values: np.array) -> np.array:
         """
         Returns an array of the 'pre-activation outputs' aka 'coalesced 
-        inputs' of the nodes in this layer.
+        inputs' of this layer.
         """
-        return self.global_input_values if self.input_layer is None else \
-            np.dot(self.input_weights.T, self.input_layer.outputs()) + self.biases
+        result = input_values
+        if self.input_layer != None:
+            result = np.dot(self.input_weights.T, self.input_layer.outputs(input_values))
+            broad_biases = np.broadcast_to(np.expand_dims(self.biases, axis=-1), result.shape)
+            result +=  broad_biases
+        return result
 
-
-    def outputs(self) -> np.array:
-        return np.vectorize(Activation.sigmoid)(self._coalesced_inputs())
+    def outputs(self, input_values: np.array) -> np.array:
+        return np.vectorize(Activation.sigmoid)(self._coalesced_inputs(input_values))
 
 class Network():
     """
@@ -112,23 +114,23 @@ class Network():
     def num_layers(self) -> int:
         return len(self.layer_sizes())
 
-    def outputs(self) -> np.array:
-        return self.layers[-1].outputs()
+    def outputs(self, input_values: np.array) -> np.array:
+        return self.layers[-1].outputs(input_values)
 
     def print_status(self, iteration: int, example: list):
         result = self.outputs()
         cost = self.cost(example[1], result)
         print(iteration, result, cost)
 
-    def adjust_global_input_values(self, global_input_values: np.array):
-        assert len(global_input_values.shape) == 1,\
-            f"global_input_values' rank must be 1 not ({len(global_input_values.shape)})."
-        layer_sizes = self.layer_sizes()
-        assert layer_sizes[0] == global_input_values.size,\
-            f'Network(): global_input_values size ({global_input_values.size})'\
-            +'does not match layer 0 spec size ({layer_sizes[0]}).'
-        # Only apply the global_input_values to the 0th layer
-        self.layers[0].global_input_values = global_input_values
+    # def adjust_global_input_values(self, global_input_values: np.array):
+    #     assert len(global_input_values.shape) == 1,\
+    #         f"global_input_values' rank must be 1 not ({len(global_input_values.shape)})."
+    #     layer_sizes = self.layer_sizes()
+    #     assert layer_sizes[0] == global_input_values.size,\
+    #         f'Network(): global_input_values size ({global_input_values.size})'\
+    #         +'does not match layer 0 spec size ({layer_sizes[0]}).'
+    #     # Only apply the global_input_values to the 0th layer
+    #     self.layers[0].global_input_values = global_input_values
 
     def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
         # The zeroth layer has no weights or biases. Thus the 0th element of 
@@ -165,6 +167,16 @@ class Network():
         outs = outputs if outputs is not None else self.outputs()
         return self.cost_implementation.cost(labels, outs)
         
+
+    def cost_M(self, labels: np.array, outputs: np.array) -> np.array:
+        assert len(labels.shape) == len(outputs.shape) == 2
+        final_layer_size = self.layer_sizes()[-1]
+        assert labels.shape[0] == outputs.shape[0] == final_layer_size
+        assert labels.shape[1] == outputs.shape[1]
+
+        return self.cost_implementation.cost_M(labels, outputs)
+
+
     def _deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
         """
         Computes the derivative of the cost function with respect to the 
@@ -321,3 +333,6 @@ class CrossEntropyImpl():
         assert labels.shape[0] == predictions.shape[0]
 
         return - (labels/predictions + (1. - labels)/(1. - predictions))
+
+    def cost_M(labels: np.array, predictions: np.array) -> np.array:
+        return 1. - predictions
