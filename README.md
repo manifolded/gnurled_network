@@ -32,9 +32,10 @@ want to get this one working first.
     [x] Implement add_delta_biases()
     [x] Implement cost functions at every level
     [ ] Figure out how to store outputs so they don't need to be recomputed all the time
-    [ ] Remove Node() class
+    [x] Remove Node() class
     [ ] Evaluate cost on all examples every time
     [x] Convert forward-prop to matrix mult
     [ ] Review new cost_func argument to insure it is used comprehensively
     [x] Replace existing cost functions with cost_m
+    [ ] Should I have put the example index first on things like input_values?
     

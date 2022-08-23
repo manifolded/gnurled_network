@@ -1,6 +1,8 @@
 from random import Random
 import numpy as np
-from math import exp, tan, pi, prod, log
+from statistics import stdev, mean
+from math import exp, tan, prod, log
+
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
@@ -221,7 +223,7 @@ class Network():
         l: int - The monomer crosses layers. This parameter designates the 
             upstream target layer, not the source layer.
         """
-        return np.einsum('nm,n -> nm',
+        return np.einsum('pn,p -> pn',
                          self._deriv_z_wrt_a_m1(l+1), 
                          self._deriv_a_wrt_z(l, input_values))
 
@@ -235,6 +237,11 @@ class Network():
         
         returns a list of tuples of matrices
         """
+        assert len(labels.shape) == 1,\
+            'labels must be rank 1, only one example allowed at a time.'
+        assert len(input_values.shape) == 1,\
+            'input_values must be rank 1, only one example allowed at a time.'
+
         f = len(self.layer_sizes()) - 1
         start_monomer = self._deriv_Cost_wrt_a_output(labels, self.outputs(input_values)) *\
             self._deriv_a_wrt_z(f, input_values)
@@ -248,7 +255,7 @@ class Network():
             delta_biases.insert(0,
                 np.dot(delta_biases[0], self._compute_back_prop_monomer_for_target_l(l, input_values).T)
             )
-        # Insert an empty entry for the input (0th) layer
+        # Insert an empty entry for the input (0th) layer - has to be np.array not None
         delta_biases.insert(0, np.empty(()))
 
         delta_weights = []
@@ -261,20 +268,13 @@ class Network():
         return list(zip(delta_weights, delta_biases))
 
 class RandomUtils():
-    def __init__(self, seed: int):
-        self.R = Random()
-        self.R.seed(seed)
+    def tan_random_float(ran_func_default_rng: callable) -> np.float32: 
+        return (lambda x: tan(2.*pi*(x - 0.5)))(ran_func_default_rng.random())
 
-    def random(self) -> np.float32:
-        return self.R.random()
-
-    def tan_random_float(self) -> np.float32: 
-        return (lambda x: tan(2.*pi*(x - 0.5)))(self.R.random())
-
-    def random_array(self, shape: tuple) -> np.array:
+    def random_array(shape: tuple, ran_func_any_dist: callable) -> np.array:
         ranlist = []
         for _ in range(prod(shape)):
-            ranlist.append(self.tan_random_float())
+            ranlist.append(ran_func_any_dist())
         # https://opensourceoptions.com/blog/10-ways-to-initialize-a-numpy-array-how-to-create-numpy-arrays/
         return np.array(ranlist).reshape(shape)
 
@@ -291,16 +291,20 @@ class Activation():
     be coding up the derivative before long, I don't think I'm going to make 
     this a class. I don't want the overhead of a constructor.
     """
-    def sigmoid(input: np.float32) -> np.float32:
+    def sigmoid(input: np.array) -> np.array:
         # Overflows will often show up here. There's no reason to try and catch
         # them. It's natural for the code to crash when it's wildly diverging.
-        return 1./(1. + exp(- input))
+        sigmoid_func = np.vectorize(lambda x: 1./(1. + exp(x * -1.)))
+        return sigmoid_func(input)
 
-    def deriv_sig(input: np.float32) -> np.float32:
-        emx:np.float32 = exp(-input)
-        assert emx > 0.,\
-            f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
-        return np.float32(- emx/((1. + emx)*(1. + emx)))
+    def deriv_sig(input: np.array) -> np.array:
+        exp_mx_func = np.vectorize(lambda x: exp(x * -1.))
+
+        # emx:np.float32 = exp(-input)
+        # assert emx > 0.,\
+        #     f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
+        deriv_sigmoid_func = np.vectorize(lambda emx: - emx/((1. + emx)*(1. + emx)))
+        return deriv_sigmoid_func(exp_mx_func(input))
 
 class CrossEntropyImpl():
     def cost(labels: np.array, predictions: np.array) -> np.array:
@@ -321,8 +325,32 @@ class CrossEntropyImpl():
         return result/(-1.*num_examples)
 
     def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
-        assert len(labels.shape) == len(predictions.shape) == 1
-        assert labels.shape[0] == predictions.shape[0]
+        # Check if arguments are rank 1, and if so harmlessly expand them.
+        lbls = labels
+        if len(lbls.shape) == 1:
+            lbls = np.expand_dims(labels, axis=-1)
+        prds = predictions
+        if len(prds.shape) == 1:
+            prds = np.expand_dims(predictions, axis=-1)
+
+        assert len(lbls.shape) == len(prds.shape) <= 2
+        assert lbls.shape[0] == prds.shape[0]
+        assert lbls.shape[1] == prds.shape[1]
 
         return - (labels/predictions + (1. - labels)/(1. - predictions))
-        
+
+class MeanVarianceConditioner():
+    def __init__(self, instances: np.array):
+        num_features = instances.shape[0]
+        self.means = [mean(instances[f,:]) for f in range(num_features)]
+        self.stdevs = [stdev(instances[f,:]) for f in range(num_features)]
+
+    def condition(self, instances: np.array):
+        num_instances = instances.shape[1]
+        result = np.empty(instances.shape)
+        for m in range(num_instances):
+            result[:,m] = (instances[:,m] - self.means)/self.stdevs
+        return result
+
+
+
