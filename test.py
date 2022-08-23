@@ -66,7 +66,7 @@ for e, example in enumerate(training):
     label = example[1]
     prediction = network.outputs(instance)
     print(network.cost_M(label, prediction))
-    delta_weights_and_biases = network.compute_delta_weights_and_biases(label, learning_rate)
+    delta_weights_and_biases = network.compute_delta_weights_and_biases(label, instance, learning_rate)
     network.add_delta_weights_and_biases(delta_weights_and_biases)
 #    network.print_status(e, example)
 
