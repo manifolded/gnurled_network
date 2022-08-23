@@ -147,27 +147,14 @@ class Network():
 
     # ============================
     # Toolkit for Back-Propagation 
-    def cost(self, labels: np.array, outputs: np.array = None) -> np.float32:
-        assert len(labels.shape) == 1,\
-            'Labels rank must be 1, not {}'.format(len(labels.shape))
-        final_layer_size = self.layer_sizes()[-1]
-        assert labels.shape[0] == final_layer_size,\
-            'Labels must have the same number of elements {} as there are nodes in the final layer {}.'\
-            .format(labels.shape[0], final_layer_size)
-
-        # Avoid recomputing the outputs by passing in the value with the 2nd argument
-        outs = outputs if outputs is not None else self.outputs()
-        return self.cost_implementation.cost(labels, outs)
-        
-
-    def cost_M(self, labels: np.array, outputs: np.array) -> np.array:
+    def cost(self, labels: np.array, outputs: np.array) -> np.array:
         assert len(labels.shape) == len(outputs.shape)
         final_layer_size = self.layer_sizes()[-1]
         assert labels.shape[0] == outputs.shape[0] == final_layer_size
         if len(labels.shape) > 1:
             assert labels.shape[1] == outputs.shape[1] 
 
-        return self.cost_implementation.cost_M(labels, outputs)
+        return self.cost_implementation.cost(labels, outputs)
 
 
     def _deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
@@ -316,20 +303,7 @@ class Activation():
         return np.float32(- emx/((1. + emx)*(1. + emx)))
 
 class CrossEntropyImpl():
-    def cost(labels: np.array, predictions: np.array) -> np.float32:
-        assert len(labels.shape) == len(predictions.shape) == 1
-        assert labels.shape[0] == predictions.shape[0]
-
-        vlog = np.vectorize(log)
-        return - np.sum(np.dot(labels, vlog(predictions)) + np.dot((1. - labels), vlog(1. - predictions)))
-
-    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
-        assert len(labels.shape) == len(predictions.shape) == 1
-        assert labels.shape[0] == predictions.shape[0]
-
-        return - (labels/predictions + (1. - labels)/(1. - predictions))
-
-    def cost_M(labels: np.array, predictions: np.array) -> np.array:
+    def cost(labels: np.array, predictions: np.array) -> np.array:
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels
         if len(lbls.shape) == 1:
@@ -345,3 +319,10 @@ class CrossEntropyImpl():
             result += np.dot(lbls[:,m], vlog(prds[:,m])) +\
                 np.dot((1. - lbls[:,m]), vlog(1. - prds[:,m]))
         return result/(-1.*num_examples)
+
+    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert len(labels.shape) == len(predictions.shape) == 1
+        assert labels.shape[0] == predictions.shape[0]
+
+        return - (labels/predictions + (1. - labels)/(1. - predictions))
+        

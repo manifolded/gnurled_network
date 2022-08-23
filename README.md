@@ -36,4 +36,5 @@ want to get this one working first.
     [ ] Evaluate cost on all examples every time
     [x] Convert forward-prop to matrix mult
     [ ] Review new cost_func argument to insure it is used comprehensively
+    [x] Replace existing cost functions with cost_m
     
