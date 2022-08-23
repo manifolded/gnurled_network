@@ -352,5 +352,20 @@ class MeanVarianceConditioner():
             result[:,m] = (instances[:,m] - self.means)/self.stdevs
         return result
 
+class InstanceLabelZipper():
+    def zipper(instances, labels):
+        num_features = instances.shape[0]
+        num_labels = labels.shape[0]
+        num_examples = instances.shape[1]
 
+        result = np.empty((num_features+num_labels, num_examples))
+        for m in range(num_examples):
+            for f in range(num_features):
+                result[f,m] = instances[f,m]
+            for l,r in zip(range(num_labels), range(num_features, num_features+num_labels)):
+                result[r,m] = labels[l,m]
+        return result
+
+    def unzipper(num_features: int, examples: np.array):
+        return (examples[0:num_features,...], examples[num_features:,...])
 

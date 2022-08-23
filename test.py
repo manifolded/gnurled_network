@@ -14,7 +14,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from network import CrossEntropyImpl, MeanVarianceConditioner
+from network import CrossEntropyImpl, MeanVarianceConditioner, InstanceLabelZipper
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -32,34 +32,18 @@ num_features = instances.shape[0]
 
 targets = np.array(list(map(fan_labels, iris['target']))).T
 
+### Conditioning instances
 mvc = MeanVarianceConditioner(instances)
 cond_instances = mvc.condition(instances)
 
-
-def instance_label_zipper(instances, labels):
-    num_features = instances.shape[0]
-    num_labels = labels.shape[0]
-    num_examples = instances.shape[1]
-
-    result = np.empty((num_features+num_labels, num_examples))
-    for m in range(num_examples):
-        for f in range(num_features):
-            result[f,m] = instances[f,m]
-        for l,r in zip(range(num_labels), range(num_features, num_features+num_labels)):
-            result[r,m] = labels[l,m]
-    return result
-
-def instance_label_unzipper(num_features: int, examples: np.array):
-    return (examples[0:num_features,...], examples[num_features:,...])
-
 ### train/test split 
-examples = instance_label_zipper(cond_instances, targets)
+examples = InstanceLabelZipper.zipper(cond_instances, targets)
 rng.shuffle(examples, axis=1)
 
 training_examples = examples[...,:120]
 test_examples = examples[...,120:]
 
-training_cond_instances, training_labels = instance_label_unzipper(num_features, training_examples)
+training_cond_instances, training_labels = InstanceLabelZipper.unzipper(num_features, training_examples)
 
 ### Construct network
 layer_sizes = (4,5,3)
@@ -70,16 +54,17 @@ training_predictions = network.outputs(training_cond_instances)
 
 print(network.cost(training_labels, training_predictions))
 
-learning_rate = 0.1
+learning_rate = 0.03
 
 num_training_examples = training_examples.shape[1]
-for e in range(0, 5): # num_training_examples):
+for e in range(0, num_training_examples):
     print(f'learning on training example {e}')
-    instance, label = instance_label_unzipper(num_features, training_examples[...,e])
+    instance, label = InstanceLabelZipper.unzipper(num_features, training_examples[...,e])
     prediction = network.outputs(instance)
 
-    # print entire training set cost
-    print(network.cost(training_labels, training_predictions))
+    # print cost computed over entire training set
+    print(network.cost(training_labels, network.outputs(training_cond_instances)))
+
     # Should not be implemented for bulk processing. Only one example at a time.
     delta_weights_and_biases = network.compute_delta_weights_and_biases(label, instance, learning_rate)
 #    print(delta_weights_and_biases[0])
