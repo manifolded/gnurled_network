@@ -1,5 +1,5 @@
 import numpy as np
-from utils import Activation
+from utils import Activation, RandomUtils
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
@@ -42,7 +42,7 @@ class Layer():
     def size(self) -> int:
         return self.size
 
-    def add_delta_weights_and_biases(self, delta_weights_and_biases: tuple):
+    def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
         delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 2,\
             'delta_weights rank must be 2, not {}'\
@@ -136,7 +136,7 @@ class Network():
     def random_delta_weights_and_biases(self) -> list:
         # The zeroth layer has no weights or biases, thus leave the 0th element
         # empty.
-        result = [(None, None)]
+        result = [[None, None]]
         layer_sizes = self.layer_sizes()
         for idx, size in enumerate(layer_sizes):
             if(idx >= 1):
@@ -239,7 +239,8 @@ class Network():
         assert len(input_values.shape) == 1,\
             'input_values must be rank 1, only one example allowed at a time.'
 
-        f = len(self.layer_sizes()) - 1
+        num_layers = len(self.layer_sizes())
+        f = num_layers - 1
         start_monomer = self._deriv_Cost_wrt_a_output(labels, self.outputs(input_values)) *\
             self._deriv_a_wrt_z(f, input_values)
         delta_biases = [start_monomer]
@@ -262,6 +263,8 @@ class Network():
             )
             vector *= -learning_rate
 
-        return list(zip(delta_weights, delta_biases))
-
-
+        result=[]
+        for l in range(num_layers):
+            result.append([delta_weights[l], delta_biases[l]])
+#        return list(zip(delta_weights, delta_biases))
+        return result

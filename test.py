@@ -57,11 +57,7 @@ def average_deltas(deltas: list):
     num_deltas = len(deltas)
     num_layers = len(deltas[0])
 
-    result = []
-    this_deltas = deltas[0]
-    for l in range(num_layers):
-        result.append(list(this_deltas[l]))
-    
+    result = deltas[0]
     for d in range(1, num_deltas):
         this_deltas = deltas[d]
         for l in range(num_layers):
@@ -99,7 +95,6 @@ for b,batch in enumerate(miniBatches):
         delta_weights_and_biaseses.append(network.compute_delta_weights_and_biases(label, instance, learning_rate))
     
     delta_weights_and_biases = average_deltas(delta_weights_and_biaseses)
-    print(delta_weights_and_biases[0])
     network.add_delta_weights_and_biases(delta_weights_and_biases)
     print('post batch cost: ', network.cost(batch_labels, network.outputs(batch_cond_instances)))
 
