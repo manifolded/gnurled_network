@@ -335,15 +335,18 @@ class BinaryCrossEntropy():
         prds = predictions
         if len(prds.shape) == 1:
             prds = np.expand_dims(predictions, axis=-1)
+        _, num_examples = lbls.shape
 
         assert len(lbls.shape) == len(prds.shape) <= 2
         assert lbls.shape == prds.shape
-        return (lbls/prds + (1. - lbls)/(1. - prds))*-1.
+        return (lbls/prds + (1. - lbls)/(1. - prds)) / -num_examples
 
 class CategoricalCrossEntropy():
     def cost(labels: np.array, predictions: np.array) -> np.array:
         assert labels.shape == predictions.shape,\
             'labels and predictions must be arrays of the same shape.'
+        assert labels.shape[0] > 2,\
+            'Categorical requires > 2 outputs.'
 
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels

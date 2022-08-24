@@ -41,30 +41,65 @@ rng.shuffle(examples, axis=1)
 training_examples = examples[...,:120]
 test_examples = examples[...,120:]
 
-training_cond_instances, training_labels = InstanceLabelZipper.unzipper(num_features, training_examples)
+def segment_examples(block_size: int, examples: np.array) -> list:
+    num_features, num_examples = examples.shape
+    num_blocks = num_examples//block_size
+    assert num_blocks*block_size == num_examples
+    blocks = [np.empty((num_features, block_size)) for _ in range(num_blocks)]
 
+    for m in range(num_blocks*block_size):
+        blocks[m//block_size][:,m%block_size] = examples[:,m]
+    return blocks
+
+def average_deltas(deltas: list):
+    # delta_weights_and_biases is a list of tuples of np.array's.
+    # deltas is a list of those!!!!
+    num_deltas = len(deltas)
+    num_layers = len(deltas[0])
+
+    result = []
+    this_deltas = deltas[0]
+    for l in range(num_layers):
+        result.append(list(this_deltas[l]))
+    
+    for d in range(1, num_deltas):
+        this_deltas = deltas[d]
+        for l in range(num_layers):
+            for t in range(2):
+               result[l][t] += this_deltas[l][t]
+
+    for l in range(num_layers):
+        for t in range(2):
+            result[l][t] /= num_deltas
+
+    return result
+
+batch_size = 5
+miniBatches = segment_examples(batch_size, training_examples)
+num_batches = len(miniBatches)
+
+learning_rate = 0.1
 ### Construct network
 layer_sizes = (4,5,3)
 network = nwk.Network(layer_sizes, rng.standard_normal, CategoricalCrossEntropy)
 
-print(network.cost(training_labels, network.outputs(training_cond_instances)))
+for b,batch in enumerate(miniBatches):
+    batch_cond_instances, batch_labels = InstanceLabelZipper.unzipper(num_features, batch)
+    print('pre batch cost: ', network.cost(batch_labels, network.outputs(batch_cond_instances)))
 
-learning_rate = 0.03
+    delta_weights_and_biaseses = []
+    for e in range(batch_size):
+        print(f'learning on training example {batch_size*b+e}')
 
-num_training_examples = training_examples.shape[1]
-for e in range(0, num_training_examples):
-    print(f'learning on training example {e}')
-    instance, label = InstanceLabelZipper.unzipper(num_features, training_examples[...,e])
-    prediction = network.outputs(instance)
+        instance, label = InstanceLabelZipper.unzipper(num_features, batch[...,e])
+        prediction = network.outputs(instance)
 
-    # print cost computed over entire training set
-    print(network.cost(training_labels, network.outputs(training_cond_instances)))
-
-    # Should not be implemented for bulk processing. Only one example at a time.
-    delta_weights_and_biases = network.compute_delta_weights_and_biases(label, instance, learning_rate)
-#    print(delta_weights_and_biases[0])
+        # Should not be implemented for bulk processing. Only one example at a time.
+        delta_weights_and_biaseses.append(network.compute_delta_weights_and_biases(label, instance, learning_rate))
+    
+    delta_weights_and_biases = average_deltas(delta_weights_and_biaseses)
+    print(delta_weights_and_biases[0])
     network.add_delta_weights_and_biases(delta_weights_and_biases)
-#    network.print_status(e, example)
-#    print(network.layers[-1].input_weights[0])
+    print('post batch cost: ', network.cost(batch_labels, network.outputs(batch_cond_instances)))
 
 print(time.process_time() - start_time, "seconds")

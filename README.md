@@ -33,10 +33,15 @@ want to get this one working first.
     [x] Implement cost functions at every level
     [ ] Figure out how to store outputs so they don't need to be recomputed all the time
     [x] Remove Node() class
-    [ ] Evaluate cost on all examples every time
+    [x] Evaluate cost on all examples every time
     [x] Convert forward-prop to matrix mult
-    [ ] Review new cost_func argument to insure it is used comprehensively
+    [x] Review new cost_func argument to insure it is used comprehensively
     [x] Replace existing cost functions with cost_m
     [ ] Should I have put the example index first on things like input_values?
-    [ ] The weights are changing. Why not the cost?
-    
+    [x] The weights are changing. Why not the cost?
+        - This turned out to be because I was failing to recompute bulk outputs before recomputing cost
+    [ ] CategoricalCrossEntropy.cost axis expansion looks fishy when supplied with scalar inputs
+    [ ] Over-train network by repeating trainings on the same training set
+    [x] Implement mini-batch gradient descent
+    [ ] Vectorize back-propagation to speed up mini-batch gradient descent
+    [ ] 
