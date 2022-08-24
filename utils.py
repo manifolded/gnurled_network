@@ -66,8 +66,8 @@ class BinaryCrossEntropy():
 
         vlog = np.vectorize(log)
         num_examples = lbls.shape[1]
-        return np.dot(lbls[0,:], vlog(prds[0,:])) +\
-            np.dot((1. - lbls[0,:]), vlog(1. - prds[0,:])) / num_examples
+        return (np.dot(lbls[0,:], vlog(prds[0,:])) +\
+            np.dot((1. - lbls[0,:]), vlog(1. - prds[0,:]))) / -num_examples
 
     def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
         assert labels.shape[0] == predictions.shape[0] == 1,\

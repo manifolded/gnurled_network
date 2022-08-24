@@ -41,4 +41,15 @@ def test_Given_oneOneNetwork_When_unitInput_Then_sigmoid_output():
     network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy)
     expected_value: np.float32 = 0.849548
     assert_almost_equal(network.outputs(unit_array), unit_array*expected_value, 6) 
+
+# Test multiple examples output
+
+def test_Given_oneOneNetwork_When_unitInput_Then_cross_cost():
+    input_array = ArrayUtils.all_ones_array((1, 1))
+    labels = np.full((1,1), [1.], dtype=np.float32)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy)
+    expected_cost: np.float32 = 0.163051 # via Mathematica
+    assert_almost_equal(network.cost(labels, network.outputs(input_array)), 
+                        expected_cost, 6) 
+
     
