@@ -46,4 +46,5 @@ want to get this one working first.
     [ ] Vectorize back-propagation to speed up mini-batch gradient descent
     [x] remove tuples from delta_weights_and_biases
     [x] Move all utility classes to their own module
+    [ ] Fix outputs() float64 issue - see dtype unit test 
     [ ] 
