@@ -44,4 +44,6 @@ want to get this one working first.
     [ ] Over-train network by repeating trainings on the same training set
     [x] Implement mini-batch gradient descent
     [ ] Vectorize back-propagation to speed up mini-batch gradient descent
+    [ ] remove tuples from delta_weights_and_biases
+    [ ] Move all utility classes to their own module
     [ ] 
