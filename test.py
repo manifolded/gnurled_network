@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -74,11 +74,13 @@ batch_size = 5
 miniBatches = segment_examples(batch_size, training_examples)
 num_batches = len(miniBatches)
 
-learning_rate = 0.1
+learning_rate = 0.03
 
 ### Construct network
-layer_sizes = (4,5,3)
-network = nwk.Network(layer_sizes, rng.standard_normal, CategoricalCrossEntropy)
+layer_sizes = (4,11,3)
+network = nwk.Network(layer_sizes, 
+                      (lambda x: ArrayUtils.gen_func_array(x, rng.standard_normal)), 
+                      CategoricalCrossEntropy)
 
 for b,batch in enumerate(miniBatches):
     batch_cond_instances, batch_labels = InstanceLabelZipper.unzipper(num_features, batch)

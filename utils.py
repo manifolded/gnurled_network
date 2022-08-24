@@ -1,6 +1,6 @@
 import numpy as np
 from statistics import stdev, mean
-from math import exp, tan, prod, log
+from math import exp, tan, pi, prod, log
 
 class RandomUtils():
     def tan_random_float(ran_func_default_rng: callable) -> np.float32: 
@@ -20,6 +20,12 @@ class ArrayUtils():
 
     def all_ones_array(shape: tuple) -> np.array:
         return np.ones(shape, dtype=np.float32)
+
+    def gen_func_array(shape: tuple, func: callable) -> np.array:
+        vals = []
+        for _ in range(prod(shape)):
+            vals.append(func())
+        return np.array(vals).reshape(shape)
 
 
 class Activation():
