@@ -89,7 +89,13 @@ class Network():
     initialization and update methods.
     """
     def __init__(self, layer_sizes: tuple, array_generator: callable, cost_implementation: callable):
-        assert all([size > 0 for size in layer_sizes])
+        if isinstance(layer_sizes, tuple):
+            assert all([size > 0 for size in layer_sizes])
+        elif isinstance(layer_sizes, int):
+            assert layer_sizes > 0
+            layer_sizes = (layer_sizes,)
+        else:
+            assert False, 'Unreckonized layer_sizes specification. Try again.'
 
         self.cost_implementation = cost_implementation
 
@@ -133,16 +139,17 @@ class Network():
             if(idx >= 1):
                 self.layers[idx].add_delta_weights_and_biases(delta_weights_and_biases[idx])
 
-    def random_delta_weights_and_biases(self) -> list:
-        # The zeroth layer has no weights or biases, thus leave the 0th element
-        # empty.
-        result = [[None, None]]
-        layer_sizes = self.layer_sizes()
-        for idx, size in enumerate(layer_sizes):
-            if(idx >= 1):
-                result.append((RandomUtils.random_array((layer_sizes[idx - 1], size)),  
-                               RandomUtils.random_array((size,))))
-        return result
+    # This should have been moved to utils module.
+    # def random_delta_weights_and_biases(self) -> list:
+    #     # The zeroth layer has no weights or biases, thus leave the 0th element
+    #     # empty.
+    #     result = [[None, None]]
+    #     layer_sizes = self.layer_sizes()
+    #     for idx, size in enumerate(layer_sizes):
+    #         if(idx >= 1):
+    #             result.append((RandomUtils.random_array((layer_sizes[idx - 1], size)),  
+    #                            RandomUtils.random_array((size,))))
+    #     return result
 
     # ============================
     # Toolkit for Back-Propagation 
