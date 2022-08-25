@@ -27,6 +27,19 @@ class ArrayUtils():
             vals.append(func())
         return np.array(vals).reshape(shape)
 
+    def identity_arrays_and_uniform_vectors(shape: tuple, 
+                                            vector_val: np.float32) -> np.array:
+        if len(shape) == 2:
+            result = np.zeros(shape, dtype=np.float32)
+            for n in range(min(*shape)):
+                result[n,n] = 1.
+            return result
+        else:
+            assert len(shape) == 1,\
+                'Desired rank wasn\'t 2 or 1. Confused.'
+            result = np.ones(shape, dtype=np.float32)
+            return vector_val*result
+
 
 class Activation():
     """
@@ -47,7 +60,7 @@ class Activation():
         # emx:np.float32 = exp(-input)
         # assert emx > 0.,\
         #     f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
-        deriv_sigmoid_func = np.vectorize(lambda emx: - emx/((1. + emx)*(1. + emx)))
+        deriv_sigmoid_func = np.vectorize(lambda emx: emx/((1. + emx)*(1. + emx)))
         return deriv_sigmoid_func(exp_mx_func(input))
 
 
