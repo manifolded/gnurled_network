@@ -106,11 +106,34 @@ def test_Given_1layerNetwork_When_deriv_cost_wrt_predictions_Then_agrees():
                                               # Computed via Mathematica
     assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost_wrt_preds, 5)
 
+def test_Given_2layerNetwork_When_deriv_cost_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2,2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+                      CategoricalCrossEntropy)
+    predictions = network.outputs(inputs)
+    verified_deriv_cost = np.array([[-0.421902,-0.377366,-0.332367],
+                                    [-0.28685,-0.240762,-0.194051]])
+                                    # Computed via Mathematica
+    deriv_cost_wrt_preds = CategoricalCrossEntropy.cost_deriv(labels, predictions)
+    assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost,5)
+
+def test_Given_2layerNetwork_When_deltaWeightsAndBiases_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2,2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+                      CategoricalCrossEntropy)
+    predictions = network.outputs(inputs)
+    verified_deriv_a_wrt_z_l1 = np.array([[0.205451,0.207295,0.209182],
+                                          [0.211101,0.213042,0.214992]])
+                                          # Computed via Mathematica
+    deriv_a_wrt_z_l1 = network._deriv_a_wrt_z(1, inputs)
+    assert_almost_equal(deriv_a_wrt_z_l1, verified_deriv_a_wrt_z_l1, 6)
+
+
 # def test_Given_1_1_network_When_backProp_Then_deltasZero():
-#     eps1 = 0.87675
-#     labels = np.full((1,), [1. - eps1], dtype=np.float32)
-#     eps2 = 0.053
-#     inputs = np.full((1,), [1.0 - eps2], dtype=np.float32)
 #     network = Network((1,1), (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), BinaryCrossEntropy)
 #     # Compute delta_weights_and_biases, the automatic approach
 #     delta_weights_and_biases = network.compute_delta_weights_and_biases(labels, inputs, 1.0)
