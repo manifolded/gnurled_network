@@ -144,7 +144,7 @@ class CategoricalCrossEntropy():
         assert lbls.shape == prds.shape
         _, num_examples = lbls.shape
 
-        return np.sum(lbls/prds, axis=-1) / -num_examples
+        return (lbls/prds) / -num_examples
 
 
 class MeanVarianceConditioner():

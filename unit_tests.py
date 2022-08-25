@@ -84,11 +84,27 @@ def balanced_pair_activations():
 
 def test_Given_1layerNetwork_When_deriv_a_wrt_z_Then_agrees():
     inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
-    network = Network((2), (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), CategoricalCrossEntropy)
+    network = Network((2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), 
+                      CategoricalCrossEntropy)
     deriv_a_wrt_z = network._deriv_a_wrt_z(0, inputs)
-    verified_deriv_a_wrt_z = np.array([[0.209773,0.217895,0.225348],[0.232008,0.237759,0.242497]])
+    verified_deriv_a_wrt_z = np.array([[0.209773,0.217895,0.225348],
+                                       [0.232008,0.237759,0.242497]])
+                                       # Computed via Mathematica
     assert_almost_equal(deriv_a_wrt_z, verified_deriv_a_wrt_z, 6)
 
+def test_Given_1layerNetwork_When_deriv_cost_wrt_predictions_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), 
+                      CategoricalCrossEntropy)
+    preds = network.outputs(inputs)
+    deriv_cost_wrt_preds = CategoricalCrossEntropy.cost_deriv(labels, preds)
+    verified_deriv_cost_wrt_preds = np.array([[-0.428224,-0.392631,-0.355144],
+                                              [-0.31539,-0.272938,-0.227292]])
+                                              # Computed via Mathematica
+    assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost_wrt_preds, 5)
 
 # def test_Given_1_1_network_When_backProp_Then_deltasZero():
 #     eps1 = 0.87675
