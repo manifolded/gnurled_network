@@ -162,7 +162,6 @@ class Network():
 
         return self.cost_implementation.cost(labels, outputs)
 
-
     def _deriv_Cost_wrt_a_output(self, labels: np.array, outputs: np.array = None) -> np.array:
         """
         Computes the derivative of the cost function with respect to the 
@@ -185,8 +184,8 @@ class Network():
         pre-activation outputs. It means the same thing. Designated z^l_n to 
         distinguish them from layer activations, always designated a^l_n.
         """
-        return np.array([Activation.deriv_sig(z) for z in self.layers[layer_id]._coalesced_inputs(input_values)])
-
+        return Activation.deriv_sig(self.layers[layer_id]._coalesced_inputs(input_values))
+        
     def _deriv_z_wrt_weights(self, layer_id: int, input_values: np.array) -> np.array:
         """
         Computes the derivative of 'z^l_n' in terms of the weights, 'W^l_{m n}'
