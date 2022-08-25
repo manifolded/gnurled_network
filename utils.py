@@ -91,8 +91,8 @@ class CategoricalCrossEntropy():
     def cost(labels: np.array, predictions: np.array) -> np.array:
         assert labels.shape == predictions.shape,\
             'labels and predictions must be arrays of the same shape.'
-        assert labels.shape[0] > 2,\
-            'Categorical requires > 2 outputs.'
+        assert labels.shape[0] >= 2,\
+            'Categorical requires >= 2 outputs.'
 
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels
@@ -105,14 +105,19 @@ class CategoricalCrossEntropy():
         vlog = np.vectorize(log)
         num_outputs, num_examples = lbls.shape
         result = 0.0
+        # Using for loop over outputs nodes to restrict ourselves to only those
+        # components that need to be evaluating (no off-diagonals)
         for p in range(num_outputs):        
-            result += np.dot(lbls[p,:], vlog(prds[p,:]).T)
+            # Using dot product to sum over all examples efficiently
+            result += np.dot(lbls[p,:], vlog(prds[p,:]))
         result /= -num_examples
         return result
 
     def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
         assert labels.shape == predictions.shape,\
             'labels and predictions must be arrays of the same shape.'
+        assert labels.shape[0] >= 2,\
+            'Categorical requires >= 2 outputs.'
 
         # Check if arguments are rank 1, and if so harmlessly expand them.
         lbls = labels
@@ -123,8 +128,7 @@ class CategoricalCrossEntropy():
             prds = np.expand_dims(predictions, axis=-1)
 
         assert len(lbls.shape) == len(prds.shape) <= 2
-        assert lbls.shape[0] == prds.shape[0]
-        assert lbls.shape[1] == prds.shape[1]
+        assert lbls.shape == prds.shape
         _, num_examples = lbls.shape
 
         return np.sum(lbls/prds, axis=-1) / -num_examples

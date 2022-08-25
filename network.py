@@ -1,5 +1,5 @@
 import numpy as np
-from utils import Activation, RandomUtils
+from utils import Activation, RandomUtils, ArrayUtils
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
