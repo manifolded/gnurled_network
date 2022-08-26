@@ -47,4 +47,7 @@ want to get this one working first.
     [x] remove tuples from delta_weights_and_biases
     [x] Move all utility classes to their own module
     [ ] Fix outputs() float64 issue - see dtype unit test 
+    [x] Modify _deriv_a_wrt_z() to return (n,m) shaped arrays
+    [ ] Omitted biases and weights should be None, not empty
+    [ ] _deriv_a_wrt_z(), why does it recompute from input_values?
     [ ] 

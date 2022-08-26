@@ -106,6 +106,8 @@ def test_Given_1layerNetwork_When_deriv_cost_wrt_predictions_Then_agrees():
                                               # Computed via Mathematica
     assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost_wrt_preds, 5)
 
+
+### 2-layer network offers testing of back-propagation
 def test_Given_2layerNetwork_When_deriv_cost_Then_agrees():
     inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
     labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
@@ -117,21 +119,60 @@ def test_Given_2layerNetwork_When_deriv_cost_Then_agrees():
                                     [-0.28685,-0.240762,-0.194051]])
                                     # Computed via Mathematica
     deriv_cost_wrt_preds = CategoricalCrossEntropy.cost_deriv(labels, predictions)
-    assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost,5)
+    assert_almost_equal(deriv_cost_wrt_preds, verified_deriv_cost, 5)
 
 def test_Given_2layerNetwork_When_deltaWeightsAndBiases_Then_agrees():
     inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
-    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy)
-    predictions = network.outputs(inputs)
     verified_deriv_a_wrt_z_l1 = np.array([[0.205451,0.207295,0.209182],
                                           [0.211101,0.213042,0.214992]])
                                           # Computed via Mathematica
     deriv_a_wrt_z_l1 = network._deriv_a_wrt_z(1, inputs)
     assert_almost_equal(deriv_a_wrt_z_l1, verified_deriv_a_wrt_z_l1, 6)
 
+def test_Given_2layerNetwork_When_derivZwrtWeights_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2,2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+                      CategoricalCrossEntropy)
+    verified_deriv_z_wrt_weights = np.array([[0.700567,0.679179,0.65701],
+                                             [0.634136,0.610639,0.586618]])
+                                              # Computed via Mathematica
+    deriv_z_wrt_weights = network._deriv_z_wrt_weights(1, inputs)
+    assert_almost_equal(deriv_z_wrt_weights, verified_deriv_z_wrt_weights, 5)
+
+def test_Given_2layerNetwork_When_computeBiases_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2,2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+                      CategoricalCrossEntropy)
+    verified_delta_biases = np.array([[0.0866802,0.0782261,0.069525],
+                                      [0.0605543,0.0512924,0.0417194]])
+                                      # Computed via Mathematica
+    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
+    delta_biases = delta_wAndB[-1][1]
+    assert_almost_equal(delta_biases, verified_delta_biases, 7)
+
+
+
+
+# def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
+#     inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+#     labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+#     network = Network((2,2), 
+#                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+#                       CategoricalCrossEntropy)
+#     verified_delta_weights = np.array([[[0.000607253,0.000531295,0.000456787],[0.000424223,0.000348367,0.000274101]],
+#                                        [[0.00054967,0.000477679,0.000407846],[0.000383996,0.000313211,0.000244733]]])
+#                                          # Computed via Mathematica
+#     delta_wAndB = network.compute_delta_weights_and_biases(labels[:,0], inputs[:,0], 1.)
+#     delta_weights = delta_wAndB[-1][0]
+#     print(delta_weights)
+#     print(delta_weights.shape, verified_delta_weights[:,:,0].shape)
+#     assert_almost_equal(delta_weights, verified_delta_weights[:,:,0], 9)
 
 # def test_Given_1_1_network_When_backProp_Then_deltasZero():
 #     network = Network((1,1), (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), BinaryCrossEntropy)
