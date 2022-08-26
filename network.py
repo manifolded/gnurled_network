@@ -239,17 +239,33 @@ class Network():
         labels: np.array - ground truth values for output
         learning_rate: np.float32 - arbitrary coefficient for delta_biases
         
-        returns a list of tuples of matrices
+        returns a list of tuples of arrays
         """
-        assert len(labels.shape) == 1,\
-            'labels must be rank 1, only one example allowed at a time.'
-        assert len(input_values.shape) == 1,\
-            'input_values must be rank 1, only one example allowed at a time.'
+        assert len(labels.shape) == 2,\
+            'labels must be rank 2, where the examples index is last.'
+        assert len(input_values.shape) == 2,\
+            'input_values must be rank 2, where the examples index is last.'
 
         num_layers = len(self.layer_sizes())
         f = num_layers - 1
-        start_monomer = self._deriv_Cost_wrt_a_output(labels, self.outputs(input_values)) *\
-            self._deriv_a_wrt_z(f, input_values)
+        num_inputs = self.layer_sizes()[0]
+        num_outputs = self.layer_sizes()[f]
+        num_examples = input_values.shape[1]
+
+        assert labels.shape == (num_outputs, num_examples)
+        assert input_values.shape == (num_inputs, num_examples)
+
+        predictions = self.outputs(input_values)
+        deriv_cost_wrt_a = self._deriv_Cost_wrt_a_output(labels, predictions)
+        deriv_a_wrt_z_f = self._deriv_a_wrt_z(f, input_values)
+        assert predictions.shape == (num_outputs, num_examples),\
+            f'predictions.shape = {predictions.shape}'
+        assert deriv_cost_wrt_a.shape == (num_outputs, num_examples),\
+            f'deriv_cost_wrt_a_f.shape = {deriv_cost_wrt_a.shape}'
+        assert deriv_a_wrt_z_f.shape == (num_outputs, num_examples),\
+            f'_deriv_a_wrt_z_f(final_layer).shape = {deriv_a_wrt_z_f.shape}'
+
+        start_monomer = np.einsum('nm,nm -> nm', deriv_cost_wrt_a, deriv_a_wrt_z_f)
         delta_biases = [start_monomer]
         # delta_weights only differs from delta_biases by the final 
         # _deriv_z_wrt_weights(l) term, see below. We start by assembling 
