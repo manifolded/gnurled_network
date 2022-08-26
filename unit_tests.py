@@ -156,6 +156,20 @@ def test_Given_2layerNetwork_When_computeBiases_Then_agrees():
     delta_biases = delta_wAndB[-1][1]
     assert_almost_equal(delta_biases, verified_delta_biases, 7)
 
+def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
+    inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
+    labels = 1. - np.arange(0.10, 0.70, 0.1, dtype=np.float32).reshape((2,3))
+    network = Network((2,2), 
+                      (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
+                      CategoricalCrossEntropy)
+    verified_delta_weights = np.array([[[0.0607253,0.0531295,0.0456787],[0.054967,0.0477679,0.0407846]],
+                                       [[0.0424223,0.0348367,0.0274101],[0.0383996,0.0313211,0.0244733]]])
+                                         # Computed via Mathematica
+    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
+    delta_weights = delta_wAndB[-1][0]
+    print(delta_weights.shape)
+    assert_almost_equal(delta_weights[:,:,0], verified_delta_weights[:,:,0], 7)
+
 
 
 
