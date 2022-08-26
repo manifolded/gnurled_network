@@ -1,5 +1,6 @@
 import numpy as np
 from utils import Activation, RandomUtils, ArrayUtils
+from numpy.testing import assert_array_equal, assert_almost_equal
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
@@ -289,5 +290,4 @@ class Network():
         result=[]
         for l in range(num_layers):
             result.append([delta_weights[l], delta_biases[l]])
-#        return list(zip(delta_weights, delta_biases))
         return result
