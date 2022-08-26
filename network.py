@@ -275,17 +275,24 @@ class Network():
         for l in range(f-1, 0, -1):
             # Prepend next monomer
             delta_biases.insert(0,
-                np.dot(delta_biases[0], self._compute_back_prop_monomer_for_target_l(l, input_values).T)
-            )
-        # Insert an empty entry for the input (0th) layer - has to be np.array not None
-        delta_biases.insert(0, np.empty(()))
+                np.einsum('nm,npm -> pm', 
+                          delta_biases[0],
+                          self._compute_back_prop_monomer_for_target_l(l, input_values)))
+        # Include placeholder for layer 0 delta biases base
+        delta_biases.insert(0, None)
 
         delta_weights = []
-        for l, vector in enumerate(delta_biases):
-            delta_weights.append(
-                -learning_rate * np.outer(vector, self._deriv_z_wrt_weights(l, input_values)).T
-            )
-            vector *= -learning_rate
+        for l, biases_base_at_l in enumerate(delta_biases):
+            if biases_base_at_l is not None:
+                assert biases_base_at_l.shape == (self.layer_sizes()[l], num_examples)
+                deriv_z_wrt_weights = self._deriv_z_wrt_weights(l, input_values)
+                assert deriv_z_wrt_weights.shape == (self.layer_sizes()[l-1], num_examples)
+                delta_weights.append(
+                    -learning_rate * np.einsum('pm,nm->pnm', biases_base_at_l, deriv_z_wrt_weights)
+                )
+                biases_base_at_l *= -learning_rate
+            else:
+                delta_weights.append(None)
 
         result=[]
         for l in range(num_layers):
