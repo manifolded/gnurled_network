@@ -73,7 +73,8 @@ class Layer():
         """
         result = input_values
         if self.input_layer != None:
-            result = np.dot(self.input_weights.T, self.input_layer.outputs(input_values))
+            input_layer_outputs = self.input_layer.outputs(input_values)
+            result = np.einsum('pn,pm -> nm', self.input_weights, input_layer_outputs)
             broad_biases = self.biases
             if len(broad_biases.shape) == 1 and len(result.shape) > 1:
                 broad_biases = np.expand_dims(self.biases, axis=-1)
