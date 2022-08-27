@@ -43,14 +43,14 @@ class Layer():
     def size(self) -> int:
         return self.size
 
-    def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
+    def add_delta_weights_and_biases_at_layer(self, delta_weights_and_biases: tuple):
         delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 2,\
             'delta_weights rank must be 2, not {}'\
             .format(len(delta_weights.shape))
         assert delta_weights.shape[1] == self.size,\
             'Number of nodes {} must match delta_weights\' 2nd extents {}'\
-            .format(self.size(), delta_weights.shape[1])
+            .format(self.size, delta_weights.shape[1])
         assert delta_weights.shape[0] == self.input_layer.size,\
             'Number of nodes in previous layer {} must match delta_weight\'s '\
             +'second index extents {}'\
@@ -137,9 +137,9 @@ class Network():
         assert len(delta_weights_and_biases) == self.num_layers(),\
             f'len(delta_weights_and_biases ({len(delta_weights_and_biases)})'\
                 f'must equal num_layers ({self.num_layers()})' 
-        for idx in range(len(delta_weights_and_biases)):
-            if(idx >= 1):
-                self.layers[idx].add_delta_weights_and_biases(delta_weights_and_biases[idx])
+        for l in range(len(delta_weights_and_biases)):
+            if(l > 0):
+                self.layers[l].add_delta_weights_and_biases_at_layer(delta_weights_and_biases[l])
 
     # This should have been moved to utils module.
     # def random_delta_weights_and_biases(self) -> list:
@@ -230,7 +230,7 @@ class Network():
         """
         return np.einsum('pn,pm -> pnm', # when called on layer l = f-1
                          self._deriv_z_wrt_a_m1(l+1), # layer f input weights
-                         self._deriv_a_wrt_z(l, input_values)) # layer f-1 sigmoid(coalesced outputs)
+                         self._deriv_a_wrt_z(l, input_values)) # layer f-1 sigmoid(coalesced inputs)
 
     def compute_delta_weights_and_biases(self, labels: np.array, input_values: np.array, 
                                          learning_rate: np.float32) -> list:
@@ -275,7 +275,7 @@ class Network():
         for l in range(f-1, 0, -1):
             # Prepend next monomer
             delta_biases.insert(0,
-                np.einsum('nm,npm -> pm', 
+                np.einsum('nm,pnm -> pm', 
                           delta_biases[0],
                           self._compute_back_prop_monomer_for_target_l(l, input_values)))
         # Include placeholder for layer 0 delta biases base
@@ -288,7 +288,7 @@ class Network():
                 deriv_z_wrt_weights = self._deriv_z_wrt_weights(l, input_values)
                 assert deriv_z_wrt_weights.shape == (self.layer_sizes()[l-1], num_examples)
                 delta_weights.append(
-                    -learning_rate * np.einsum('pm,nm->pnm', biases_base_at_l, deriv_z_wrt_weights)
+                    -learning_rate * np.einsum('nm,pm->pnm', biases_base_at_l, deriv_z_wrt_weights)
                 )
                 biases_base_at_l *= -learning_rate
             else:
