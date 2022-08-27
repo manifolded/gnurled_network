@@ -228,9 +228,9 @@ class Network():
         l: int - The monomer crosses layers. This parameter designates the 
             upstream target layer, not the source layer.
         """
-        return np.einsum('pn,p -> pn',
-                         self._deriv_z_wrt_a_m1(l+1), 
-                         self._deriv_a_wrt_z(l, input_values))
+        return np.einsum('pn,pm -> pnm', # when called on layer l = f-1
+                         self._deriv_z_wrt_a_m1(l+1), # layer f input weights
+                         self._deriv_a_wrt_z(l, input_values)) # layer f-1 sigmoid(coalesced outputs)
 
     def compute_delta_weights_and_biases(self, labels: np.array, input_values: np.array, 
                                          learning_rate: np.float32) -> list:
