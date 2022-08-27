@@ -48,7 +48,7 @@ rng.shuffle(examples, axis=1)
 training_examples = examples[...,:120]
 test_examples = examples[...,120:]
 
-learning_rate = 0.01
+learning_rate = 10.0
 
 ### Construct network
 layer_sizes = (4,5,3)
@@ -57,8 +57,10 @@ network = nwk.Network(layer_sizes,
                       CategoricalCrossEntropy)
 
 training_conditioned_instances, training_labels = InstanceLabelZipper.unzipper(num_features, training_examples)
+num_examples = training_examples.shape[1]
+print('Starting cost: ', network.cost(training_labels, network.outputs(training_conditioned_instances)))
 
-for e,_ in enumerate(training_examples):
+for e in range(num_examples):
     print(f'learning on training example {e}')
     example = np.expand_dims(training_examples[:,e], axis=-1)
 
@@ -68,6 +70,10 @@ for e,_ in enumerate(training_examples):
     delta = DeltasFunnel.average(deltas)
 
     network.add_delta_weights_and_biases(delta)
-    print('post batch cost: ', network.cost(training_labels, network.outputs(training_conditioned_instances)))
+    print('post example cost: ', network.cost(training_labels, network.outputs(training_conditioned_instances)))
+
+test_conditioned_instances, test_labels = InstanceLabelZipper.unzipper(num_features, test_examples)
+print('test examples cost: ', network.cost(test_labels, network.outputs(test_conditioned_instances)))
 
 print(time.process_time() - start_time, "seconds")
+

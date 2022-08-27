@@ -205,6 +205,11 @@ def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
     delta_weights = delta_wAndB[1][0]
     assert_almost_equal(delta_weights, verified_delta_weights, 7)
 
+
+### Need unit tests for uneven layer sizes to test for p,n v. n,p ambiguity, 
+### especially when we go to transpose defn for weights
+
+
 ### =================================================
 # def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
 #     inputs = 1. - np.arange(0.15, 0.75, 0.1, dtype=np.float32).reshape((2,3))
