@@ -162,8 +162,8 @@ def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy)
-    verified_delta_weights = np.array([[[0.0607253,0.0531295,0.0456787],[0.054967,0.0477679,0.0407846]],
-                                       [[0.0424223,0.0348367,0.0274101],[0.0383996,0.0313211,0.0244733]]])
+    verified_delta_weights = np.array([[[0.0607253,0.0531295,0.0456787],[0.0424223,0.0348367,0.0274101]],
+                                       [[0.054967,0.0477679,0.0407846],[0.0383996,0.0313211,0.0244733]]])
                                          # Computed via Mathematica
     delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
     delta_weights = delta_wAndB[-1][0]
@@ -198,8 +198,8 @@ def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
     network = Network((2,2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy)
-    verified_delta_weights = np.array([[[0.0123831,0.0108009,0.00925588],[0.0112089,0.00971091,0.00826419]],
-                                       [[0.00856641,0.0070091,0.0054939],[0.0077541,0.00630178,0.00490528]]])
+    verified_delta_weights = np.array([[[0.0123831,0.0108009,0.00925588],[0.00856641,0.0070091,0.0054939]],
+                                       [[0.0112089,0.00971091,0.00826419],[0.0077541,0.00630178,0.00490528]]])
                                       # Computed via Mathematica
     delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
     delta_weights = delta_wAndB[1][0]
