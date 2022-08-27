@@ -176,4 +176,22 @@ class InstanceLabelZipper():
         return result
 
     def unzipper(num_features: int, examples: np.array):
+        assert len(examples.shape) == 2
         return (examples[0:num_features,...], examples[num_features:,...])
+
+
+class DeltasFunnel():
+    def average(weightsAndBiases: list) -> list:
+        num_layers = len(weightsAndBiases)
+        num_examples = weightsAndBiases[1][0].shape[1]
+        result = [None] * num_layers
+
+        for l,layerLweightsAndBiases in enumerate(weightsAndBiases):
+            if l > 0:
+                thisWeights, thisBiases = layerLweightsAndBiases
+                weights = np.sum(thisWeights, axis=-1) / num_examples
+                biases = np.sum(thisBiases, axis=-1) / num_examples
+                result[l] = (weights, biases)
+            else:
+                result[l] = (None, None)
+        return result
