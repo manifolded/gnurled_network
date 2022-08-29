@@ -195,3 +195,71 @@ class DeltasFunnel():
             else:
                 result[l] = (None, None)
         return result
+
+class PreparatoryUtils():
+    def fan_out_categories_to_separate_outputs(_label: int, num_outputs: int):
+        """
+        Takes single categorical labels (e.g. 0,1,2) and converts them to 
+        num_outputs category specific outputs.
+
+        t: int - label for an example
+        returns numpy array with only a single 1
+        """
+        result = np.zeros(num_outputs, dtype=np.int16)
+        result[_label] = 1
+        return result
+
+    def batch_examples(block_size: int, examples: np.array) -> list:
+        """
+        Collects examples from the input into individual batches, with each 
+        batch containing exactly block_size of them.
+
+        block_size: int - Number of examples in each batch
+        examples: numpy.array - input for set of examples
+        returns a list of batches
+        """
+        num_features, num_examples = examples.shape
+        num_blocks = num_examples//block_size
+        assert num_blocks*block_size == num_examples
+        blocks = [np.empty((num_features, block_size)) for _ in range(num_blocks)]
+
+        for m in range(num_blocks*block_size):
+            blocks[m//block_size][:,m%block_size] = examples[:,m]
+        return blocks
+
+    def average_of_several_deltas(deltas: list):
+        # delta_weights_and_biases is a list of tuples of np.array's.
+        # deltas is the list of those.
+        num_deltas = len(deltas)
+        num_layers = len(deltas[0])
+
+        result = deltas[0]
+        for d in range(1, num_deltas):
+            this_deltas = deltas[d]
+            for l in range(num_layers): # layer index
+                if l > 0:
+                    for t in range(2): # tuple index
+                        result[l][t] += this_deltas[l][t]
+
+        for l in range(num_layers):
+            if l > 0:
+                for t in range(2):
+                    result[l][t] /= num_deltas
+        return result
+
+    def average_of_bulk_deltas(deltas: list) -> list:
+        num_deltas = deltas[1][0].shape[-1]
+        num_layers = len(deltas)
+
+        result = deltas
+        for l in range(1, num_layers):
+            for t in range(2):
+                new_shape_assert = list(deltas[l][t].shape)
+                new_shape_assert.pop()
+                # print(f'average: l={l} and t={t}: deltas={deltas[l][t].shape}')
+                result[l][t] = np.add.reduce(deltas[l][t], axis=-1, keepdims=False)
+                # print(f'average: l={l} and t={t}: result={result[l][t].shape}')
+                # print(f'average: l={l} and t={t}: new_shape={new_shape_assert}')
+                assert list(result[l][t].shape) == new_shape_assert
+                result[l][t] /= num_deltas
+        return result
