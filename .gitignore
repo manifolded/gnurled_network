@@ -4,3 +4,4 @@ Papers and Docs/
 *.log
 *.pdf
 *.bib
+**/.DS_Store
