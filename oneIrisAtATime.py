@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, DeltasFunnel
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, DeltasFunnel, PreparatoryUtils
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -20,22 +20,10 @@ rng = np.random.default_rng(12345678)
 iris = load_iris()
 ### Gotta randomize the dataset. The ground truths are sorted. See below.
 
-def fan_out_categories_to_separate_outputs(t):
-    """
-    Take single categorical labels (e.g. 0,1,2) and convert to 
-    individual-category outputs (in this case three of them.)
-    
-    t: int - label for an example
-    returns numpy array with only a single 1
-    """
-    result = np.zeros(3)
-    result[t] = 1.0
-    return result
-
 instances = iris['data'].T
 num_features = instances.shape[0]
 
-targets = np.array(list(map(fan_out_categories_to_separate_outputs, iris['target']))).T
+targets = np.array(list(map(lambda x: PreparatoryUtils.fan_out_categories_to_separate_outputs(x, 3), iris['target']))).T
 num_predictions = targets.shape[0]
 
 ### Conditioning instances

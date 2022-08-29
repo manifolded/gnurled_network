@@ -50,4 +50,6 @@ want to get this one working first.
     [x] Modify _deriv_a_wrt_z() to return (n,m) shaped arrays
     [x] Omitted biases and weights should be None, not empty
     [ ] _deriv_a_wrt_z(), why does it recompute from input_values?
+    [ ] Individual inputs are called attributes. What are outputs called?
+        - Features?
     [ ] 
