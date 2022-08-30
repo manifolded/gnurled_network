@@ -10,7 +10,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 from network import Network
-from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, PreparatoryUtils
+from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, PreparatoryUtils, DeltaWeightsAndBiases
 
 @pytest.fixture
 def single_feature_geometric_instances(num_examples: int):
@@ -237,6 +237,24 @@ def test_Given_multiDeltas_When_takeAverage_Then_agrees(toy_deltas, average_delt
     for l in range(1, len(toy_deltas)):
         for t in range(2):
             assert_almost_equal(averaged_deltas[l][t], average_delta_from_toy_deltas[l][t], 6)
+
+def test_Given_deltaWeightsAndBiases_When_construct_Then_success(toy_deltas):
+    num_examples = toy_deltas[1][0].shape[-1]
+    num_layers = len(toy_deltas)
+    layer_sizes = [toy_deltas[1][0].shape[0]]
+    for l in range(1,num_layers):
+        layer_sizes.append(toy_deltas[l][1].shape[0])
+
+
+    delta = DeltaWeightsAndBiases(layer_sizes, num_examples)
+    for l in range(1, num_layers):
+        delta[l,0] = toy_deltas[l][0]
+        delta[l,1] = toy_deltas[l][1]
+
+    print(delta)
+
+
+
 
 ### Need unit tests for uneven layer sizes to test for p,n v. n,p ambiguity, 
 ### especially when we go to transpose defn for weights

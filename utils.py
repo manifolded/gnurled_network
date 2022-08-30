@@ -227,7 +227,7 @@ class PreparatoryUtils():
             blocks[m//block_size][:,m%block_size] = examples[:,m]
         return blocks
 
-    def average_of_several_deltas(deltas: list):
+    def average_of_distinct_deltas(deltas: list):
         # delta_weights_and_biases is a list of tuples of np.array's.
         # deltas is the list of those.
         num_deltas = len(deltas)
@@ -272,3 +272,40 @@ class PreparatoryUtils():
             # And finally we cast it back to tuple
             result[l] = tuple(result[l])
         return result
+
+class DeltaWeightsAndBiases:
+    """
+    Defines holder class for weights and biases updates generally known as 
+    delta_weights_and_biases.
+
+    delta_weights_and_biases is a list of length num_layers, where each element
+    is a list containing two numpy.arrays representing that layer's weights
+    and biases respectively.
+    """
+    def __init__(self, layer_sizes: tuple, num_examples: int):
+        self.num_layers = len(layer_sizes)
+        self.contents = [(None,None)]
+        for l in range(1, self.num_layers):
+            this_layer_size = layer_sizes[l]
+            last_layer_size = layer_sizes[l-1]
+            self.contents.append([np.empty((last_layer_size, this_layer_size, num_examples), dtype=np.float32), 
+                                  np.empty((this_layer_size, num_examples), dtype=np.float32)])
+    
+    def __getitem__(self, indices: tuple) -> np.array:
+        assert len(indices) == 2
+        l, t = indices
+        assert l != 0,\
+            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+        assert l < self.num_layers
+        assert t < 2
+        return self.contents[l][t]
+
+    def __setitem__(self, indices: tuple, value):
+        assert len(indices) == 2
+        l, t = indices
+        assert l != 0,\
+            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+        assert l < self.num_layers
+        assert t < 2
+        self.contents[l][t] = value
+
