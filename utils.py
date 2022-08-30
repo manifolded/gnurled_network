@@ -196,6 +196,123 @@ class DeltasFunnel():
                 result[l] = (None, None)
         return result
 
+class DeltaWeightsAndBiases:
+    """
+    Defines holder class for weights and biases updates generally known as 
+    delta_weights_and_biases.
+
+    delta_weights_and_biases is a list of length num_layers, where each element
+    is a list containing two numpy.arrays representing that layer's weights
+    and biases respectively.
+    """
+    def __init__(self, layer_sizes: tuple, num_examples: int):
+        self.num_layers = len(layer_sizes)
+        self.contents = [(None,None)]
+        for l in range(1, self.num_layers):
+            this_layer_size = layer_sizes[l]
+            last_layer_size = layer_sizes[l-1]
+            self.contents.append([np.empty((last_layer_size, this_layer_size, num_examples), dtype=np.float32), 
+                                  np.empty((this_layer_size, num_examples), dtype=np.float32)])
+
+    @classmethod
+    def ingest(self, delta_weights_and_biases: list):
+        self.num_layers = len(delta_weights_and_biases)
+        num_examples = delta_weights_and_biases[1][0].shape[-1]
+        layer_sizes = [delta_weights_and_biases[1][0].shape[0]]
+        for l in range(1, self.num_layers):
+            layer_sizes.append(delta_weights_and_biases[l][1].shape[0])
+
+        self.contents = DeltaWeightsAndBiases(layer_sizes, num_examples).contents
+        for l in range(1, self.num_layers):
+            for t in range(2):
+                self.contents[l][t] = delta_weights_and_biases[l][t]
+
+        return self
+
+    @classmethod
+    def copy(self):
+        num_examples = self._getNumExamples
+        layer_sizes = self._getLayerSizes
+        num_layers = len(layer_sizes)
+        result = DeltaWeightsAndBiases(layer_sizes, num_examples)
+        for l in range(1, num_layers):
+            for t in range(2):
+                result[l, t] = self.contents[l, t]
+        return result
+
+    @classmethod
+    def _getLayerSizes(self):
+        layer_sizes = [self.contents[1][0].shape[0]]
+        for l in range(1, self.num_layers):
+            layer_sizes.append(self.contents[l][1].shape[0])
+        return layer_sizes
+
+    @classmethod
+    def getNumLayers(self):
+        return len(self.contents)
+
+    def _getNumExamples(self):
+        return self.contents[1,0].shape[-1]
+
+    def __getitem__(self, indices: tuple) -> np.array:
+        assert len(indices) == 2
+        l, t = indices
+        assert l != 0,\
+            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+        assert l < self.num_layers
+        assert t < 2
+        return self.contents[l][t]
+
+    def __setitem__(self, indices: tuple, value):
+        assert len(indices) == 2
+        l, t = indices
+        assert l != 0,\
+            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+        assert l < self.num_layers
+        assert t < 2
+        self.contents[l][t] = value
+
+    @classmethod
+    def average(self):
+        """
+        Reduces a DeltaWeightsAndBiases (DWABs) representing a batch of 
+        delta_weights_and_biases down to just one by averaging them. Useful 
+        for applying micro-batch weights and biases updates.
+
+        Parent is expected to contain the batch of DWABs to be averaged. 
+            Individual DWABs are represented via the examples (final) index 
+            on each layer's numpy.arrays.
+
+        Returns a reduced DeltaWeightsAndBiases without (or rather, reduced to 
+        dimension 1) the extra index on each layer's weights and biases arrays.
+        """
+        num_examples = self.contents[1][0].shape[-1]
+        num_layers = len(self.contents)
+        layer_sizes = self._getLayerSizes()
+
+        result = DeltaWeightsAndBiases(layer_sizes, 1)
+        for l in range(1, num_layers):
+            for t in range(2):
+                result[l, t] = np.add.reduce(self.contents[l][t], axis=-1, keepdims=False) / num_examples
+                assert result[l, t].shape == self.contents[l][t].shape[:-1]
+
+        return result
+
+
+        # for l in range(1, num_layers):
+        #     # element assignment doesn't work on tuples so we cast the result[l] to list
+        #     result[l] = list(deltas[l])
+        #     for t in range(2):
+        #         # print(f'average: l={l} and t={t}: deltas={deltas[l][t].shape}')
+        #         result_new_shape = deltas[l][t].shape[:-1]
+        #         result[l][t] = np.add.reduce(result[l][t], axis=-1, keepdims=False)
+        #         # print(f'average: l={l} and t={t}: result={result[l][t].shape}')
+        #         result[l][t] /= num_deltas
+        #         assert result[l][t].shape == result_new_shape
+        #     # And finally we cast it back to tuple
+        #     result[l] = tuple(result[l])
+        # return result
+
 class PreparatoryUtils():
     def fan_out_categories_to_separate_outputs(_label: int, num_outputs: int):
         """
@@ -247,65 +364,4 @@ class PreparatoryUtils():
                     result[l][t] /= num_deltas
         return result
 
-    def average_of_bulk_deltas(deltas: list) -> list:
-        """
-        Reduces several delta_weights_and_biases down to just one by averaging
-        them. Useful for applying micro-batch weights and biases updates.
-
-        deltas: list - A list of delta_weights_and_biases to be averaged
-        Returns delta_weights_and_biases
-        """
-        num_deltas = deltas[1][0].shape[-1]
-        num_layers = len(deltas)
-
-        result = deltas
-        for l in range(1, num_layers):
-            # element assignment doesn't work on tuples so we cast the result[l] to list
-            result[l] = list(deltas[l])
-            for t in range(2):
-                # print(f'average: l={l} and t={t}: deltas={deltas[l][t].shape}')
-                result_new_shape = deltas[l][t].shape[:-1]
-                result[l][t] = np.add.reduce(result[l][t], axis=-1, keepdims=False)
-                # print(f'average: l={l} and t={t}: result={result[l][t].shape}')
-                result[l][t] /= num_deltas
-                assert result[l][t].shape == result_new_shape
-            # And finally we cast it back to tuple
-            result[l] = tuple(result[l])
-        return result
-
-class DeltaWeightsAndBiases:
-    """
-    Defines holder class for weights and biases updates generally known as 
-    delta_weights_and_biases.
-
-    delta_weights_and_biases is a list of length num_layers, where each element
-    is a list containing two numpy.arrays representing that layer's weights
-    and biases respectively.
-    """
-    def __init__(self, layer_sizes: tuple, num_examples: int):
-        self.num_layers = len(layer_sizes)
-        self.contents = [(None,None)]
-        for l in range(1, self.num_layers):
-            this_layer_size = layer_sizes[l]
-            last_layer_size = layer_sizes[l-1]
-            self.contents.append([np.empty((last_layer_size, this_layer_size, num_examples), dtype=np.float32), 
-                                  np.empty((this_layer_size, num_examples), dtype=np.float32)])
-    
-    def __getitem__(self, indices: tuple) -> np.array:
-        assert len(indices) == 2
-        l, t = indices
-        assert l != 0,\
-            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
-        assert l < self.num_layers
-        assert t < 2
-        return self.contents[l][t]
-
-    def __setitem__(self, indices: tuple, value):
-        assert len(indices) == 2
-        l, t = indices
-        assert l != 0,\
-            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
-        assert l < self.num_layers
-        assert t < 2
-        self.contents[l][t] = value
 

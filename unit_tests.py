@@ -232,29 +232,43 @@ def average_delta_from_toy_deltas():
     biases2[0] = 0.333333
     return result
 
-def test_Given_multiDeltas_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
-    averaged_deltas = PreparatoryUtils.average_of_bulk_deltas(toy_deltas)
-    for l in range(1, len(toy_deltas)):
-        for t in range(2):
-            assert_almost_equal(averaged_deltas[l][t], average_delta_from_toy_deltas[l][t], 6)
+# def test_Given_multiDeltas_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
+#     averaged_deltas = PreparatoryUtils.average_of_bulk_deltas(toy_deltas)
+#     for l in range(1, len(toy_deltas)):
+#         for t in range(2):
+#             assert_almost_equal(averaged_deltas[l][t], average_delta_from_toy_deltas[l][t], 6)
 
-def test_Given_deltaWeightsAndBiases_When_construct_Then_success(toy_deltas):
+def test_Given_deltaWeightsAndBiases_When_construct_Then_agrees(toy_deltas):
     num_examples = toy_deltas[1][0].shape[-1]
     num_layers = len(toy_deltas)
     layer_sizes = [toy_deltas[1][0].shape[0]]
     for l in range(1,num_layers):
         layer_sizes.append(toy_deltas[l][1].shape[0])
 
-
     delta = DeltaWeightsAndBiases(layer_sizes, num_examples)
     for l in range(1, num_layers):
-        delta[l,0] = toy_deltas[l][0]
-        delta[l,1] = toy_deltas[l][1]
+        for t in range(2):
+            delta[l, t] = toy_deltas[l][t]
 
-    print(delta)
+    for l in range(1, num_layers):
+        for t in range(2):
+            assert_array_equal(delta[l, t], toy_deltas[l][t])
+    
 
+def test_Given_deltaWeightsAndBiases_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
+    
 
+    # ingest() is not a constructor. It can only be called on an instantiated object.
+    toy_DWABs = DeltaWeightsAndBiases.ingest(toy_deltas)
+    
+    assert toy_DWABs is not None
+    num_layers = toy_DWABs.getNumLayers()
 
+    average_DWABs = toy_DWABs.average()
+
+    for l in range(1, num_layers):
+        for t in range(2):
+            assert_almost_equal(average_DWABs[l, t], average_delta_from_toy_deltas[l][t], 6)
 
 ### Need unit tests for uneven layer sizes to test for p,n v. n,p ambiguity, 
 ### especially when we go to transpose defn for weights
