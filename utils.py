@@ -248,18 +248,27 @@ class PreparatoryUtils():
         return result
 
     def average_of_bulk_deltas(deltas: list) -> list:
+        """
+        Reduces several delta_weights_and_biases down to just one by averaging
+        them. Useful for applying micro-batch weights and biases updates.
+
+        deltas: list - A list of delta_weights_and_biases to be averaged
+        Returns delta_weights_and_biases
+        """
         num_deltas = deltas[1][0].shape[-1]
         num_layers = len(deltas)
 
         result = deltas
         for l in range(1, num_layers):
+            # element assignment doesn't work on tuples so we cast the result[l] to list
+            result[l] = list(deltas[l])
             for t in range(2):
-                new_shape_assert = list(deltas[l][t].shape)
-                new_shape_assert.pop()
                 # print(f'average: l={l} and t={t}: deltas={deltas[l][t].shape}')
-                result[l][t] = np.add.reduce(deltas[l][t], axis=-1, keepdims=False)
+                result_new_shape = deltas[l][t].shape[:-1]
+                result[l][t] = np.add.reduce(result[l][t], axis=-1, keepdims=False)
                 # print(f'average: l={l} and t={t}: result={result[l][t].shape}')
-                # print(f'average: l={l} and t={t}: new_shape={new_shape_assert}')
-                assert list(result[l][t].shape) == new_shape_assert
                 result[l][t] /= num_deltas
+                assert result[l][t].shape == result_new_shape
+            # And finally we cast it back to tuple
+            result[l] = tuple(result[l])
         return result

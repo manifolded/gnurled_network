@@ -10,7 +10,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 from network import Network
-from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, Activation
+from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, PreparatoryUtils
 
 @pytest.fixture
 def single_feature_geometric_instances(num_examples: int):
@@ -205,6 +205,38 @@ def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
     delta_weights = delta_wAndB[1][0]
     assert_almost_equal(delta_weights, verified_delta_weights, 7)
 
+### Test Misc Funcs For Microbatching
+@pytest.fixture
+def toy_deltas():
+    result = [(None, None), (np.zeros((1,2,3)), np.zeros((2,3))), (np.zeros((2,1,3)), np.zeros((1,3)))]
+    weights1 = result[1][0]
+    weights1[0,0,0] = weights1[0,1,1] = 1
+    biases1 = result[1][1]
+    biases1[0,0] = biases1[1,1] = 1
+    weights2 = result[2][0]
+    weights2[0,0,0] = weights2[1,0,1] = 1
+    biases2 = result[2][1]
+    biases2[0,0] = 1
+    return result
+
+@pytest.fixture
+def average_delta_from_toy_deltas():
+    result = [(None,None), (np.zeros((1,2)), np.zeros((2,))), (np.zeros((2,1)), np.zeros((1,)))]
+    weights1 = result[1][0] 
+    weights1[0,0] = weights1[0,1] = 0.333333
+    biases1 = result[1][1]
+    biases1[0] = biases1[1] = 0.333333
+    weights2 = result[2][0]
+    weights2[0,0] = weights2[1,0] = 0.333333
+    biases2 = result[2][1]
+    biases2[0] = 0.333333
+    return result
+
+def test_Given_multiDeltas_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
+    averaged_deltas = PreparatoryUtils.average_of_bulk_deltas(toy_deltas)
+    for l in range(1, len(toy_deltas)):
+        for t in range(2):
+            assert_almost_equal(averaged_deltas[l][t], average_delta_from_toy_deltas[l][t], 6)
 
 ### Need unit tests for uneven layer sizes to test for p,n v. n,p ambiguity, 
 ### especially when we go to transpose defn for weights
