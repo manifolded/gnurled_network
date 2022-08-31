@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -20,61 +20,27 @@ rng = np.random.default_rng(12345678)
 iris = load_iris()
 ### Gotta randomize the dataset. The ground truths are sorted. See below.
 
-def fan_labels(t):
-    result = np.zeros(3)
-    result[t] = 1.0
-    return result
-
 instances = iris['data'].T
 num_features = instances.shape[0]
 
-targets = np.array(list(map(fan_labels, iris['target']))).T
+labels = np.array(list(map(lambda x: PreparatoryUtils.fan_out_categories_to_separate_outputs(x, 3), iris['target']))).T
 
 ### Conditioning instances
 mvc = MeanVarianceConditioner(instances)
 cond_instances = mvc.condition(instances)
 
 ### train/test split 
-examples = InstanceLabelZipper.zipper(cond_instances, targets)
+examples = InstanceLabelZipper.zipper(cond_instances, labels)
 rng.shuffle(examples, axis=1)
 
 training_examples = examples[...,:120]
 test_examples = examples[...,120:]
 
-def segment_examples(block_size: int, examples: np.array) -> list:
-    num_features, num_examples = examples.shape
-    num_blocks = num_examples//block_size
-    assert num_blocks*block_size == num_examples
-    blocks = [np.empty((num_features, block_size)) for _ in range(num_blocks)]
-
-    for m in range(num_blocks*block_size):
-        blocks[m//block_size][:,m%block_size] = examples[:,m]
-    return blocks
-
-def average_deltas(deltas: list):
-    # delta_weights_and_biases is a list of tuples of np.array's.
-    # deltas is a list of those!!!!
-    num_deltas = len(deltas)
-    num_layers = len(deltas[0])
-
-    result = deltas[0]
-    for d in range(1, num_deltas):
-        this_deltas = deltas[d]
-        for l in range(num_layers):
-            for t in range(2):
-               result[l][t] += this_deltas[l][t]
-
-    for l in range(num_layers):
-        for t in range(2):
-            result[l][t] /= num_deltas
-
-    return result
-
 batch_size = 5
-miniBatches = segment_examples(batch_size, training_examples)
+miniBatches = PreparatoryUtils.batch_examples(batch_size, training_examples)
 num_batches = len(miniBatches)
 
-learning_rate = 0.03
+learning_rate = 10.0
 
 ### Construct network
 layer_sizes = (4,11,3)
@@ -82,22 +48,14 @@ network = nwk.Network(layer_sizes,
                       (lambda x: ArrayUtils.gen_func_array(x, rng.standard_normal)), 
                       CategoricalCrossEntropy)
 
-for b,batch in enumerate(miniBatches):
-    batch_cond_instances, batch_labels = InstanceLabelZipper.unzipper(num_features, batch)
-    print('pre batch cost: ', network.cost(batch_labels, network.outputs(batch_cond_instances)))
+for batch in miniBatches:
+    batch_conditioned_instances, batch_labels = InstanceLabelZipper.unzipper(num_features, batch)
+    print('pre batch cost: ', network.cost(batch_labels, network.outputs(batch_conditioned_instances)))
 
-    delta_weights_and_biaseses = []
-    for e in range(batch_size):
-        print(f'learning on training example {batch_size*b+e}')
+    deltas = network.compute_DeltaWeightsAndBiases(batch_labels, batch_conditioned_instances, learning_rate)
+    ave_delta = deltas.average()
 
-        instance, label = InstanceLabelZipper.unzipper(num_features, batch[...,e])
-        prediction = network.outputs(instance)
-
-        # Should not be implemented for bulk processing. Only one example at a time.
-        delta_weights_and_biaseses.append(network.compute_delta_weights_and_biases(label, instance, learning_rate))
-    
-    delta_weights_and_biases = average_deltas(delta_weights_and_biaseses)
-    network.add_delta_weights_and_biases(delta_weights_and_biases)
-    print('post batch cost: ', network.cost(batch_labels, network.outputs(batch_cond_instances)))
+    network.add_DeltaWeightsAndBiases(ave_delta)
+    print('post batch cost: ', network.cost(batch_labels, network.outputs(batch_conditioned_instances)))
 
 print(time.process_time() - start_time, "seconds")
