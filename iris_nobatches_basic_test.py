@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, DeltasFunnel, PreparatoryUtils
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils, DeltaWeightsAndBiases
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -53,11 +53,11 @@ for e in range(num_examples):
     example = np.expand_dims(training_examples[:,e], axis=-1)
 
     example_conditioned_instances, example_labels = InstanceLabelZipper.unzipper(num_features, example)
-    deltas = network.compute_delta_weights_and_biases(example_labels, example_conditioned_instances, learning_rate)
+    deltas = network.compute_DeltaWeightsAndBiases(example_labels, example_conditioned_instances, learning_rate)
     
-    delta = DeltasFunnel.average(deltas)
+    delta = deltas.average()
 
-    network.add_delta_weights_and_biases(delta)
+    network.add_DeltaWeightsAndBiases(delta)
     print('post example cost: ', network.cost(training_labels, network.outputs(training_conditioned_instances)))
 
 test_conditioned_instances, test_labels = InstanceLabelZipper.unzipper(num_features, test_examples)

@@ -53,5 +53,6 @@ want to get this one working first.
     [ ] Individual inputs are called attributes. What are outputs called?
         - Features?
     [ ] Create delta_weights_and_biases type with overloaded operators
-    [ ] Remove duplicate DeltasFunnel.average() and PreparatoryUtils.average_of_bulk_deltas
+    [x] Remove duplicate DeltasFunnel.average() and PreparatoryUtils.average_of_bulk_deltas
+    [x] Strip extraneous member data from DeltaWeightsAndBiases
     [ ] 
