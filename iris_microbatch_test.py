@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils, DeltaWeightsAndBiases
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -42,7 +42,7 @@ batch_size = 5
 miniBatches = PreparatoryUtils.batch_examples(batch_size, training_examples)
 num_batches = len(miniBatches)
 
-learning_rate = 1.0
+learning_rate = 10.0
 
 ### Construct network
 layer_sizes = (4,11,3)
@@ -55,9 +55,9 @@ for b, batch in enumerate(miniBatches):
     batch_conditioned_instances, batch_labels = InstanceLabelZipper.unzipper(num_features, batch)
     print('pre batch cost: ', network.cost(batch_labels, network.outputs(batch_conditioned_instances)))
 
-    deltas = network.compute_delta_weights_and_biases(batch_labels, batch_conditioned_instances, learning_rate)
-    delta_weights_and_biases = PreparatoryUtils.average_of_bulk_deltas(deltas)
-    network.add_delta_weights_and_biases(delta_weights_and_biases)
+    deltas = network.compute_DeltaWeightsAndBiases(batch_labels, batch_conditioned_instances, learning_rate)
+    delta = deltas.average()
+    network.add_DeltaWeightsAndBiases(delta)
     print('post batch cost: ', network.cost(batch_labels, network.outputs(batch_conditioned_instances)))
 
 print(time.process_time() - start_time, "seconds")
