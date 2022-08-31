@@ -256,7 +256,6 @@ def test_Given_deltaWeightsAndBiases_When_construct_Then_agrees(toy_deltas):
 def test_Given_deltaWeightsAndBiases_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
     toy_DWABs = DeltaWeightsAndBiases.ingest(toy_deltas)
     num_layers = toy_DWABs.getNumLayers()
-
     average_DWABs = toy_DWABs.average()
 
     for l in range(1, num_layers):
@@ -266,8 +265,8 @@ def test_Given_deltaWeightsAndBiases_When_takeAverage_Then_agrees(toy_deltas, av
 
 def test_Given_toyDWABs_When_applyToNetwork_Then_success(toy_deltas, average_delta_from_toy_deltas):
     toy_DWABs = DeltaWeightsAndBiases.ingest(toy_deltas)
-    average_DWABs = toy_DWABs.average()
     num_layers = toy_DWABs.getNumLayers()
+    average_DWABs = toy_DWABs.average()
 
     network = Network((1,2,1), ArrayUtils.all_zeros_array, BinaryCrossEntropy)
     network.add_DeltaWeightsAndBiases(average_DWABs)
