@@ -180,23 +180,7 @@ class InstanceLabelZipper():
         return (examples[0:num_features,...], examples[num_features:,...])
 
 
-class DeltasFunnel():
-    def average(weightsAndBiases: list) -> list:
-        num_layers = len(weightsAndBiases)
-        num_examples = weightsAndBiases[1][0].shape[1]
-        result = [None] * num_layers
-
-        for l,layerLweightsAndBiases in enumerate(weightsAndBiases):
-            if l > 0:
-                thisWeights, thisBiases = layerLweightsAndBiases
-                weights = np.sum(thisWeights, axis=-1) / num_examples
-                biases = np.sum(thisBiases, axis=-1) / num_examples
-                result[l] = (weights, biases)
-            else:
-                result[l] = (None, None)
-        return result
-
-class DeltaWeightsAndBiases:
+class DeltaWeightsAndBiases():
     """
     Defines holder class for weights and biases updates generally known as 
     delta_weights_and_biases.
@@ -206,55 +190,59 @@ class DeltaWeightsAndBiases:
     and biases respectively.
     """
     def __init__(self, layer_sizes: tuple, num_examples: int):
-        self.num_layers = len(layer_sizes)
-        self.contents = [(None,None)]
-        for l in range(1, self.num_layers):
+        num_layers = len(layer_sizes)
+        self._contents = [(None,None)]
+        for l in range(1, num_layers):
             this_layer_size = layer_sizes[l]
             last_layer_size = layer_sizes[l-1]
-            self.contents.append([np.empty((last_layer_size, this_layer_size, num_examples), dtype=np.float32), 
+            self._contents.append([np.empty((last_layer_size, this_layer_size, num_examples), dtype=np.float32), 
                                   np.empty((this_layer_size, num_examples), dtype=np.float32)])
 
     @classmethod
-    def ingest(self, delta_weights_and_biases: list):
-        self.num_layers = len(delta_weights_and_biases)
-        num_examples = delta_weights_and_biases[1][0].shape[-1]
+    def ingest(cls, delta_weights_and_biases: list):
+        # get layer_sizes from delta_weights_and_biases
+        num_layers = len(delta_weights_and_biases)
         layer_sizes = [delta_weights_and_biases[1][0].shape[0]]
-        for l in range(1, self.num_layers):
+        for l in range(1, num_layers):
             layer_sizes.append(delta_weights_and_biases[l][1].shape[0])
+        num_examples = delta_weights_and_biases[1][0].shape[-1]
 
-        self.contents = DeltaWeightsAndBiases(layer_sizes, num_examples).contents
-        for l in range(1, self.num_layers):
-            for t in range(2):
-                self.contents[l][t] = delta_weights_and_biases[l][t]
+        self = cls(layer_sizes, num_examples)
 
+        self._contents = [(None, None)]
+        for l in range(1, num_layers):
+            self._contents.append([delta_weights_and_biases[l][0], delta_weights_and_biases[l][1]])
         return self
 
-    @classmethod
     def copy(self):
         num_examples = self._getNumExamples
         layer_sizes = self._getLayerSizes
-        num_layers = len(layer_sizes)
-        result = DeltaWeightsAndBiases(layer_sizes, num_examples)
+
+        new_self = DeltaWeightsAndBiases(layer_sizes, num_examples)
+
+        num_layers = self.getNumLayers()
         for l in range(1, num_layers):
             for t in range(2):
-                result[l, t] = self.contents[l, t]
-        return result
+                new_self[l, t] = self._contents[l, t]
+        return new_self
 
-    @classmethod
     def _getLayerSizes(self):
-        layer_sizes = [self.contents[1][0].shape[0]]
-        for l in range(1, self.num_layers):
-            layer_sizes.append(self.contents[l][1].shape[0])
+        num_layers = self.getNumLayers()
+        layer_sizes = [self._contents[1][0].shape[0]]
+        for l in range(1, num_layers):
+            layer_sizes.append(self._contents[l][1].shape[0])
         return layer_sizes
 
-    @classmethod
+    # It's not a class method. This fcn only makes sense when it is reporting a quality of
+    # its member data.
     def getNumLayers(self):
-        return len(self.contents)
+        return len(self._contents)
 
     def _getNumExamples(self):
-        return self.contents[1,0].shape[-1]
+        return self._contents[1,0].shape[-1]
 
     def __getitem__(self, indices) -> np.array:
+        num_layers = self.getNumLayers()
         if(isinstance(indices, tuple)):
             assert len(indices) == 2
             l,t = indices
@@ -263,12 +251,12 @@ class DeltaWeightsAndBiases:
                 #     assert l.start > 0, \
                 #         'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
                 # if l.stop is not None:
-                #     assert l.stop < self.num_layers
+                #     assert l.stop < num_layers
                 assert False, 'layer index cannot be sliced.'
             else:
                 assert l != 0, \
                     'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
-                assert l < self.num_layers
+                assert l < num_layers
             if isinstance(t, slice):
                 if t.start is not None:
                     assert t.start >= 0
@@ -276,23 +264,22 @@ class DeltaWeightsAndBiases:
                     assert t.stop < 2
             else:
                 assert t < 2
-            return self.contents[l][t]
+            return self._contents[l][t]
         else:
             assert not isinstance(indices, slice),\
                 'DeltaWeightsAndBiases: Single slicing not implemented yet.'
-            return self.contents[indices][:]
-
+            return self._contents[indices][:]
 
     def __setitem__(self, indices: tuple, value):
+        num_layers = self.getNumLayers()
         assert len(indices) == 2
         l, t = indices
         assert l != 0,\
             'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
-        assert l < self.num_layers
+        assert l < num_layers
         assert t < 2
-        self.contents[l][t] = value
+        self._contents[l][t] = value
 
-    @classmethod
     def average(self):
         """
         Reduces a DeltaWeightsAndBiases (DWABs) representing a batch of 
@@ -306,32 +293,18 @@ class DeltaWeightsAndBiases:
         Returns a reduced DeltaWeightsAndBiases without (or rather, reduced to 
         dimension 1) the extra index on each layer's weights and biases arrays.
         """
-        num_examples = self.contents[1][0].shape[-1]
-        num_layers = len(self.contents)
+        num_examples = self._contents[1][0].shape[-1]
+        num_layers = self.getNumLayers()
         layer_sizes = self._getLayerSizes()
 
         result = DeltaWeightsAndBiases(layer_sizes, 1)
         for l in range(1, num_layers):
             for t in range(2):
-                result[l, t] = np.add.reduce(self.contents[l][t], axis=-1, keepdims=False) / num_examples
-                assert result[l, t].shape == self.contents[l][t].shape[:-1]
+                result[l, t] = np.add.reduce(self._contents[l][t], axis=-1, keepdims=False) / num_examples
+                assert result[l, t].shape == self._contents[l][t].shape[:-1]
 
         return result
 
-
-        # for l in range(1, num_layers):
-        #     # element assignment doesn't work on tuples so we cast the result[l] to list
-        #     result[l] = list(deltas[l])
-        #     for t in range(2):
-        #         # print(f'average: l={l} and t={t}: deltas={deltas[l][t].shape}')
-        #         result_new_shape = deltas[l][t].shape[:-1]
-        #         result[l][t] = np.add.reduce(result[l][t], axis=-1, keepdims=False)
-        #         # print(f'average: l={l} and t={t}: result={result[l][t].shape}')
-        #         result[l][t] /= num_deltas
-        #         assert result[l][t].shape == result_new_shape
-        #     # And finally we cast it back to tuple
-        #     result[l] = tuple(result[l])
-        # return result
 
 class PreparatoryUtils():
     def fan_out_categories_to_separate_outputs(_label: int, num_outputs: int):
@@ -363,25 +336,5 @@ class PreparatoryUtils():
         for m in range(num_blocks*block_size):
             blocks[m//block_size][:,m%block_size] = examples[:,m]
         return blocks
-
-    def average_of_distinct_deltas(deltas: list):
-        # delta_weights_and_biases is a list of tuples of np.array's.
-        # deltas is the list of those.
-        num_deltas = len(deltas)
-        num_layers = len(deltas[0])
-
-        result = deltas[0]
-        for d in range(1, num_deltas):
-            this_deltas = deltas[d]
-            for l in range(num_layers): # layer index
-                if l > 0:
-                    for t in range(2): # tuple index
-                        result[l][t] += this_deltas[l][t]
-
-        for l in range(num_layers):
-            if l > 0:
-                for t in range(2):
-                    result[l][t] /= num_deltas
-        return result
 
 
