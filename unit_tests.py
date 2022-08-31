@@ -152,8 +152,9 @@ def test_Given_2layerNetwork_When_computeBiases_Then_agrees():
     verified_delta_biases = np.array([[0.0866802,0.0782261,0.069525],
                                       [0.0605543,0.0512924,0.0417194]])
                                       # Computed via Mathematica
-    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
-    delta_biases = delta_wAndB[-1][1]
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    # delta_biases = delta_wAndB[-1][1]
+    delta_biases = delta_wAndB[-1, 1]
     assert_almost_equal(delta_biases, verified_delta_biases, 7)
 
 def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
@@ -165,8 +166,9 @@ def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
     verified_delta_weights = np.array([[[0.0607253,0.0531295,0.0456787],[0.0424223,0.0348367,0.0274101]],
                                        [[0.054967,0.0477679,0.0407846],[0.0383996,0.0313211,0.0244733]]])
                                          # Computed via Mathematica
-    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
-    delta_weights = delta_wAndB[-1][0]
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    # delta_weights = delta_wAndB[-1][0]
+    delta_weights = delta_wAndB[-1, 0]
     assert_almost_equal(delta_weights[:,:,0], verified_delta_weights[:,:,0], 7)
 
 ### 3-layer network offers testing of back-propagation with monomers
@@ -188,8 +190,9 @@ def test_Given_3layerNetwork_When_computeBiases_Then_agrees():
                       CategoricalCrossEntropy)
     verified_delta_biases = np.array([[0.0176759,0.0159029,0.0140879],[0.0122278,0.01032,0.00836197]])
                                       # Computed via Mathematica
-    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
-    delta_biases = delta_wAndB[1][1]
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    # delta_biases = delta_wAndB[1][1]
+    delta_biases = delta_wAndB[1, 1]
     assert_almost_equal(delta_biases, verified_delta_biases, 7)
 
 def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
@@ -201,8 +204,9 @@ def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
     verified_delta_weights = np.array([[[0.0123831,0.0108009,0.00925588],[0.00856641,0.0070091,0.0054939]],
                                        [[0.0112089,0.00971091,0.00826419],[0.0077541,0.00630178,0.00490528]]])
                                       # Computed via Mathematica
-    delta_wAndB = network.compute_delta_weights_and_biases(labels, inputs, 1.)
-    delta_weights = delta_wAndB[1][0]
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    # delta_weights = delta_wAndB[1][0]
+    delta_weights = delta_wAndB[1, 0]
     assert_almost_equal(delta_weights, verified_delta_weights, 7)
 
 ### Test Misc Funcs For Microbatching
@@ -232,12 +236,6 @@ def average_delta_from_toy_deltas():
     biases2[0] = 0.333333
     return result
 
-# def test_Given_multiDeltas_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
-#     averaged_deltas = PreparatoryUtils.average_of_bulk_deltas(toy_deltas)
-#     for l in range(1, len(toy_deltas)):
-#         for t in range(2):
-#             assert_almost_equal(averaged_deltas[l][t], average_delta_from_toy_deltas[l][t], 6)
-
 def test_Given_deltaWeightsAndBiases_When_construct_Then_agrees(toy_deltas):
     num_examples = toy_deltas[1][0].shape[-1]
     num_layers = len(toy_deltas)
@@ -256,12 +254,7 @@ def test_Given_deltaWeightsAndBiases_When_construct_Then_agrees(toy_deltas):
     
 
 def test_Given_deltaWeightsAndBiases_When_takeAverage_Then_agrees(toy_deltas, average_delta_from_toy_deltas):
-    
-
-    # ingest() is not a constructor. It can only be called on an instantiated object.
     toy_DWABs = DeltaWeightsAndBiases.ingest(toy_deltas)
-    
-    assert toy_DWABs is not None
     num_layers = toy_DWABs.getNumLayers()
 
     average_DWABs = toy_DWABs.average()
@@ -269,6 +262,20 @@ def test_Given_deltaWeightsAndBiases_When_takeAverage_Then_agrees(toy_deltas, av
     for l in range(1, num_layers):
         for t in range(2):
             assert_almost_equal(average_DWABs[l, t], average_delta_from_toy_deltas[l][t], 6)
+
+
+def test_Given_toyDWABs_When_applyToNetwork_Then_success(toy_deltas, average_delta_from_toy_deltas):
+    toy_DWABs = DeltaWeightsAndBiases.ingest(toy_deltas)
+    average_DWABs = toy_DWABs.average()
+    num_layers = toy_DWABs.getNumLayers()
+
+    network = Network((1,2,1), ArrayUtils.all_zeros_array, BinaryCrossEntropy)
+    network.add_DeltaWeightsAndBiases(average_DWABs)
+    
+    for l in range(1, num_layers):
+        for t in range(2):
+            assert_almost_equal(network.layers[l].get_WeightsAndBiases()[t], average_delta_from_toy_deltas[l][t], 6)
+
 
 ### Need unit tests for uneven layer sizes to test for p,n v. n,p ambiguity, 
 ### especially when we go to transpose defn for weights

@@ -254,14 +254,34 @@ class DeltaWeightsAndBiases:
     def _getNumExamples(self):
         return self.contents[1,0].shape[-1]
 
-    def __getitem__(self, indices: tuple) -> np.array:
-        assert len(indices) == 2
-        l, t = indices
-        assert l != 0,\
-            'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
-        assert l < self.num_layers
-        assert t < 2
-        return self.contents[l][t]
+    def __getitem__(self, indices) -> np.array:
+        if(isinstance(indices, tuple)):
+            assert len(indices) == 2
+            l,t = indices
+            if isinstance(l, slice):
+                # if l.start is not None:
+                #     assert l.start > 0, \
+                #         'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+                # if l.stop is not None:
+                #     assert l.stop < self.num_layers
+                assert False, 'layer index cannot be sliced.'
+            else:
+                assert l != 0, \
+                    'DeltaWeightsAndBiases: no access to layer 0 weights and biases.'
+                assert l < self.num_layers
+            if isinstance(t, slice):
+                if t.start is not None:
+                    assert t.start >= 0
+                if t.stop is not None:
+                    assert t.stop < 2
+            else:
+                assert t < 2
+            return self.contents[l][t]
+        else:
+            assert not isinstance(indices, slice),\
+                'DeltaWeightsAndBiases: Single slicing not implemented yet.'
+            return self.contents[indices][:]
+
 
     def __setitem__(self, indices: tuple, value):
         assert len(indices) == 2

@@ -1,5 +1,5 @@
 import numpy as np
-from utils import Activation, RandomUtils, ArrayUtils
+from utils import Activation, RandomUtils, ArrayUtils, DeltaWeightsAndBiases
 from numpy.testing import assert_array_equal, assert_almost_equal
 class Layer():
     """
@@ -53,7 +53,7 @@ class Layer():
             .format(self.size, delta_weights.shape[1])
         assert delta_weights.shape[0] == self.input_layer.size,\
             'Number of nodes in previous layer {} must match delta_weight\'s '\
-            +'second index extents {}'\
+            +'first index extents {}'\
             .format(self.input_layer.size(), delta_weights.shape[0])
 
         delta_biases = delta_weights_and_biases[1]
@@ -66,7 +66,10 @@ class Layer():
 
         self.input_weights += delta_weights
         self.biases += delta_biases
-        
+
+    def get_WeightsAndBiases(self) -> tuple:
+        return (self.input_weights, self.biases)
+
     def _coalesced_inputs(self, input_values: np.array) -> np.array:
         """
         Returns an array of the 'pre-activation outputs' aka 'coalesced 
@@ -126,32 +129,15 @@ class Network():
     def outputs(self, input_values: np.array) -> np.array:
         return self.layers[-1].outputs(input_values)
 
-    def print_status(self, iteration: int, example: list):
-        result = self.outputs()
-        cost = self.cost(example[1], result)
-        print(iteration, result, cost)
+    def add_DeltaWeightsAndBiases(self, deltas: DeltaWeightsAndBiases):
+        assert deltas.getNumLayers() == self.num_layers()
+        for l in range(1, deltas.getNumLayers()):
+            self.layers[l].add_delta_weights_and_biases_at_layer(deltas[l])
 
-    def add_delta_weights_and_biases(self, delta_weights_and_biases: list):
-        # The zeroth layer has no weights or biases. Thus the 0th element of 
-        # delta_weights_and_biases is ignored.
-        assert len(delta_weights_and_biases) == self.num_layers(),\
-            f'len(delta_weights_and_biases ({len(delta_weights_and_biases)})'\
-                f'must equal num_layers ({self.num_layers()})' 
-        for l in range(len(delta_weights_and_biases)):
-            if(l > 0):
-                self.layers[l].add_delta_weights_and_biases_at_layer(delta_weights_and_biases[l])
-
-    # This should have been moved to utils module.
-    # def random_delta_weights_and_biases(self) -> list:
-    #     # The zeroth layer has no weights or biases, thus leave the 0th element
-    #     # empty.
-    #     result = [[None, None]]
-    #     layer_sizes = self.layer_sizes()
-    #     for idx, size in enumerate(layer_sizes):
-    #         if(idx >= 1):
-    #             result.append((RandomUtils.random_array((layer_sizes[idx - 1], size)),  
-    #                            RandomUtils.random_array((size,))))
-    #     return result
+    def get_WeightsAndBiases(self) -> DeltaWeightsAndBiases:
+        result = DeltaWeightsAndBiases(self.layer_sizes, 1)
+        for l in range(1, self.num_layers):
+            result[l] = self.layers[l].get_WeightsAndBiases()
 
     # ============================
     # Toolkit for Back-Propagation 
@@ -232,15 +218,16 @@ class Network():
                          self._deriv_z_wrt_a_m1(l+1), # layer f input weights
                          self._deriv_a_wrt_z(l, input_values)) # layer f-1 sigmoid(coalesced inputs)
 
-    def compute_delta_weights_and_biases(self, labels: np.array, input_values: np.array, 
-                                         learning_rate: np.float32) -> list:
+    def compute_DeltaWeightsAndBiases(self, labels: np.array, input_values: np.array, 
+                                      learning_rate: np.float32) -> list:
         """
-        Computes delta_weights_and_biases for all layers, excluding the 0th.
+        Computes delta weight and bias arrays for all layers. (Except for the 
+        input layer where it just returns (None, None).)
 
         labels: np.array - ground truth values for output
         learning_rate: np.float32 - arbitrary coefficient for delta_biases
         
-        returns a list of tuples of arrays
+        returns a DeltaWeightsAndBiases
         """
         assert len(labels.shape) == 2,\
             'labels must be rank 2, where the examples index is last.'
@@ -266,35 +253,33 @@ class Network():
         assert deriv_a_wrt_z_f.shape == (num_outputs, num_examples),\
             f'_deriv_a_wrt_z_f(final_layer).shape = {deriv_a_wrt_z_f.shape}'
 
+        result = DeltaWeightsAndBiases(self.layer_sizes(), num_examples)
         start_monomer = np.einsum('nm,nm -> nm', deriv_cost_wrt_a, deriv_a_wrt_z_f)
-        delta_biases = [start_monomer]
-        # delta_weights only differs from delta_biases by the final 
-        # _deriv_z_wrt_weights(l) term, see below. We start by assembling 
-        # delta_biases and then apply the weights term at the end. No such 
-        # suffix is required for bias deltas.
-        for l in range(f-1, 0, -1):
-            # Prepend next monomer
-            delta_biases.insert(0,
-                np.einsum('nm,pnm -> pm', 
-                          delta_biases[0],
-                          self._compute_back_prop_monomer_for_target_l(l, input_values)))
-        # Include placeholder for layer 0 delta biases base
-        delta_biases.insert(0, None)
 
-        delta_weights = []
-        for l, biases_base_at_l in enumerate(delta_biases):
+        # We will fill in the bias arrays starting at the final layer, and working
+        # backwards.
+        result[f,1] = start_monomer
+        # delta_weights (result[:,0]), only differs from delta_biases 
+        # (result[:,1]) by the final _deriv_z_wrt_weights(l) term, see below. 
+        # We start by assembling delta_biases and then apply the weights term 
+        # at the end. No such suffix is required for bias deltas.
+        for l in range(f-1, 0, -1):
+            # Postpend next monomer term as we progress through the 
+            # network, starting with the final layer and working backwards.
+            result[l,1] = \
+                np.einsum('nm,pnm -> pm', 
+                          result[l+1, 1],
+                          self._compute_back_prop_monomer_for_target_l(l, input_values))
+
+        for l in range(1, num_layers):
+            biases_base_at_l = result[l,1]
             if biases_base_at_l is not None:
                 assert biases_base_at_l.shape == (self.layer_sizes()[l], num_examples)
                 deriv_z_wrt_weights = self._deriv_z_wrt_weights(l, input_values)
                 assert deriv_z_wrt_weights.shape == (self.layer_sizes()[l-1], num_examples)
-                delta_weights.append(
-                    -learning_rate * np.einsum('nm,pm->pnm', biases_base_at_l, deriv_z_wrt_weights)
-                )
-                biases_base_at_l *= -learning_rate
-            else:
-                delta_weights.append(None)
 
-        result=[]
-        for l in range(num_layers):
-            result.append([delta_weights[l], delta_biases[l]])
+                result[l, 0] = \
+                    -learning_rate * np.einsum('nm,pm->pnm', biases_base_at_l, deriv_z_wrt_weights)
+                # Now we are free to include the learning rate on the biases side as well.
+                biases_base_at_l *= -learning_rate
         return result
