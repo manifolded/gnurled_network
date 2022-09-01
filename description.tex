@@ -213,4 +213,22 @@ We have expressed eqns. (\ref{eqn:deltaBiases}) and (\ref{eqn:deltaWeights}) in 
 
 Note that we made a poor choice for the indexing of $W^l_{b a}$. The motivation was that the first index, in this case $b$, would enumerate the prior layer's nodes and the second index, $a$, this layer's nodes. At the time this seemed reasonable enough. Unfortunately it winds up requiring each monomer to be transposed before it can be applied. It would have been cleaner to have chosen $W^l_{a b}$.
 
+\section{Vectorization}
+Having had the opportunity to train a couple neural networks based on toy model data available through sci-kit learn we discovered the value of being able to compute the output for an arbitrary number of examples with a single function call. This can be accomplished by taking what was previously a vector (rank 1 object) of features and expand it to become a matrix (rank 2 object) where the first index still counts over features, but we also introduce a new second index that counts over the multiple examples. This enormously reduces the computational expense of computing the cost for an entire data set by taking advantage of clever libraries and specialized hardware that perform matrix operations extraordinarily quickly.
+
+\subsection{Numpy's Einsum}
+I have experience using Einstein summation notation for describing operations on matrix-like objects and so I am naturally drawn to Numpy's \code{einsum()} routine. It unifies a wide range of array operations within a single function call. Rather than mucking about with transposes and axis-specific summations and element-wise matrix multiplication, I ultimately decided to transform all that complexity into fashioning cryptic little \code{einsum()} directive strings like $'a, ba, cb, dc \rightarrow bd'$ which expresses a funny sort of multiplication of four input arrays (rank 1, 2, 2, 2 respectively) and produces a single output. That output has rank-2 because but dummy index, $b$, triggered multiplication but not summation. It was not contracted upon because of its appearance on the RHS of the directive.
+
+Einsum is also quite fast, and I haven't even explored the option to 'compile' einsum directives yet.
+
+It's not that it's impossible to express the desired operations in standard matrix operations. Consider the exceedingly common operation of multiplying a weights matrix against the previous layer's outputs: $W^l_{p n} \, a^{l - 1}_p$. This can be expressed in standard array operations as \code{np.dot(W.T, a)} or equivalently with the Einsum directive $'pn,p \rightarrow n'$ where we are contracting over $p$. There is no particular advantage to either approach in this case.
+
+Next we'll introduce an additional index that counts over all the examples. We are then faced with $W^l_{p n} \, a^{l - 1}_{p m}$. It is well represented by the exact same expression, \code{np.dot(W.T, a)}, while in Einsum it becomes $pn,pm \rightarrow nm$. 
+
+Now let's do hard example, let's implement Eqn. (\ref{eqn:costWRTweightsF}). We start with the element-wise multiplication of the first two terms. $t1$ is the cost deriv term and has the shape $(N_n, N_m)$ where $N_n$ is the number of nodes on layer $l$ and $N_m$ is the number of examples. $t2$ is the deriv-a-wrt-z term and has the same shape $(N_n, N_m)$. Suppose you try to perform the multiplication with \code{np.multiply(t1, t2)}. Are you sure what numpy is going to do? What if $N_m$ just so happens to be broadcastable to $N_n$? Fairly frequently $N_m = 1$, which is broadcastable to anything.
+
+With Einsum you won't have this problem. The directive is very specific about how each index is to be treated and in what order. If you want the $m$-index to be treated differently than the others, that's no problem. The whole formula can be expressed as $'nm,nm,pm -> pnm'$ leaving no ambiguity as to the desired operation. 
+
+It was my intention, for better or worse, that the $m$-index always be the last one. This probably isn't the best choice when examining debugging output, but it seemed simple at the time. It is not trivial to achieve such a goal with standard matrix multiplication operations where the order of the indices is dictated by the operation, and not by the programmer.
+
 \end{document}
