@@ -19,14 +19,14 @@
 
 \begin{document}
 
-\title{Poorly Vectorized Neural Network Implementation With Back-Propagation}
+\title{Vectorized Neural Network Implementation With Back-Propagation}
 \author{Keith D. Matthews}
-\affiliation{Acerbic Associates}
+% \affiliation{Acerbic Associates}
 
-\date{21 August 2022}
+\date{1 September 2022}
 
 \begin{abstract}
-In the pursuit of a thorough understanding of the basic principles behind neural networks I thought I'd better construct a library from scratch. This document describes the design of that library, worts and all.
+In the pursuit of a thorough understanding of the basic principles behind the back-propagation algorithm I thought I'd better construct a neural network simulation library from scratch. This document describes the design of that library.
 \end{abstract}
 
 \maketitle
@@ -35,61 +35,56 @@ In the pursuit of a thorough understanding of the basic principles behind neural
 
 \section{Notation and Eqns of Forward-Propagation}
 
-The network stores a list of layers, $\textbf{L}$, which in turn store a list of nodes $\textbf{N}$. When the network's output is queried with \code{output()} this in turn calls \code{output()} at the list level, and then, in turn, at the node level. The pre-activation output (AKA the 'coalesced input') of node $m$ on layer $l$ is obtained from
+Interaction with the simulated network is through the \code{Network} class. Underlying the \code{Network} is a  \code{Layer} class (but no node class behind that.) Forward propagation is triggered with a call to \code{network.outputs()} which in turn calls \code{layer.outputs()} which in turn calls the previous layer's \code{previous_layer.outputs()} and on and on until there remains no previous layer.
 
-\begin{align}
-    \label{eqn:coalescence}
-    \bld{z}^l = \bld{W}^l \, \bld{a}^{l - 1} + \bld{b}^l
-\end{align}
-
-$\bld{a}^{l - 1}$ are the post-activation outputs of the immediately upstream (prior) layer, $l-1$. $\bld{W}^l$ are the weights connecting those outputs of layer $l - 1$ to the inputs of layer $l$. (Note that $\bld{W}^l$ is associated with layer $l$ and not with layer $l-1$.) These weights are expressed as a matrix, $W^l_{b a}$ where $b$ indexes the previous layer's nodes, while $a$ indexes the current layer's nodes. Similarly $\bld{b}^l$ are the biases for each of the nodes in layer $l$ and is well expressed as a vector, $b^l_a$, with one component for node in layer $l$. At the node level biases are scalars while weights are vectors.
-
-With this understanding of the rank of each of these objects, and how it relates the granularity (or level) we may express (\ref{eqn:coalescence}) in component notation.
-
+The pre-activation output (AKA the 'coalesced input') of node $m$ on layer $l$ is defined by
 \begin{align}
     \label{eqn:componentCoalescence}
-    z^l_m = W^l_{n m} \, a^{l - 1}_n + b^{l}_m
+    z^l_n = W^l_{p n} \, a^{l - 1}_p + b^{l}_n
 \end{align}
+
+The $a^{l - 1}_p$ are the post-activation outputs of the immediately upstream (prior) layer, $l-1$. $W^l_{p n}$ are the weights connecting those outputs of layer $l - 1$ to the inputs of layer $l$. (Note that $W^l_{p n}$ is associated with layer $l$ and not with layer $l-1$.) These weights are expressed as a matrix, $W^l_{b a}$ where $b$ indexes the previous layer's nodes, while $a$ indexes the current layer's nodes. Similarly $b^l_n$ are the biases for each of the nodes in layer $l$ and is well expressed as a vector with one component for each node in layer $l$.
 
 The input layer, where $l = 0$, is denoted $\bld{L}^0$ and is special in that it has no weights or biases associated with it.
 
-The relationship between the nodes' activation outputs, $\bld{a}^l$ and their coalesced inputs, $\bld{z}^l$ is described by
+The reader will understand that the expression of each of these quantities in abstract/bold-face notation, e.g. $\bld{a}^l$, refers to the same object as the index notation version, $a^l_n$. Thus we may express the relationship between the nodes' activation outputs, $\bld{a}^l$ and their coalesced inputs, $\bld{z}^l$, as 
 \begin{align}
     \label{eqn:activation}
     \bld{a}^l = g(\bld{z}^l)
 \end{align}
-where $g$ is called the activation function. $g$ does not mix components the way $\bld{W}$ does, instead it acts like a scalar treating each of the components of its input independently. In component notation we have
+where $g$ is called the activation function. Equivalently, in component notation we have
 \begin{align}
+    \label{eqn:componentActivation}
     a^l_n = g(z^l_n)
 \end{align}
-Together eqns (\ref{eqn:coalescence}) and (\ref{eqn:activation}) can be used to bootstrap from layer to layer until the network's output is computed. By taking derivatives of these, and a cost function, we will derive back-propagation.
+where Eqns. (\ref{eqn:activation}) and (\ref{eqn:componentActivation}) as equivalent.
+
+Together eqns (\ref{eqn:componentCoalescence}) and (\ref{eqn:componentActivation}) can be used to chain the computation from layer to layer until computation of the network's output is complete. Furthermore, by taking derivatives of these, along with a cost function, we will derive back-propagation.
+
+Please note that $g$ does not mix components the way $\bld{W}$ does, instead it acts like a scalar treating each of the components of its input independently. 
 
 \section{Training Data}
-The \textit{predictions} (network level outputs) of the network are denoted $\bld{\hat{y}}$ while the inputs (\textit{examples}) are denoted $\bld{x}$. Training data is composed of examples labeled with known ground truth outputs denoted $\bld{\hat{y}}$. We identify the predictions $\hat{y}_m$ with the activation values $a^f_m = \hat{y}_m$ when the inputs are $z^0_n = x_n$ set to the example values. With those definitions we may define the cross-entropy cost function, denoted $\mathscr{C}$, that scores the predictions according to how closely they match the ground truth.
+The \textit{predictions} (network level outputs) of the network are denoted $\bld{\hat{y}}$ while the inputs (\textit{examples}) are denoted $\bld{x}$. Training data is composed of examples labeled with known ground truth outputs denoted $\bld{y}$. We identify the predictions $\hat{y}_n$ with the activation values $a^f_n = \hat{y}_n$ when the inputs are $z^0_p = x_p$ set to the example values. With those definitions we may define the cross-entropy cost function, denoted $\mathscr{C}$, that scores the predictions according to how closely they match the ground truth.
 
 \begin{align}
     \label{eqn:costDefn}
-    \mathscr{C} \equiv - \sum \left(y \ln \hat{y} + (1 - y) \ln (1 - \hat{y}) \right)
+    \cC \equiv - \sum_n \left(y_n \ln \hat{y}_n \right)
 \end{align}
-The idea is that the greater the gap between the predicted outputs and ground truth the higher the score. By adjusting the weights and biases we hope to minimize the cost and thereby bring the predicted outputs in alignment with the ground truth. This process is known as \textit{training} the network. Note that the summation is gone, it has been dissolved by the derivative which picked out just one term.
-
-We will need to express the cost function in component notation to faciliate later taking the derivative,
-\begin{align}
-    \cC = - \sum_m \left( y_m \ln \hat{y}_m + (1 - y_m) \ln (1 - \hat{y}_m) \right)
-\end{align}
+The idea is that the greater the gap between the predicted outputs and ground truth the higher the score. By adjusting the weights and biases we hope to minimize the cost and thereby bring the predicted outputs in alignment with the ground truth labels. This process is known as \textit{training} the network. Note that the summation is gone, it has been dissolved by the derivative which picked out just one term.
 
 We will also need the cost function's derivative which we derive analytically.
 \begin{align}
-    \parpar{\cC}{\hat{y}_r} = - \left( \frac{y_r}{\hat{y}_r} + \frac{1 - y_r}{1 - \hat{y}_r} \right)
+    \label{eqn:derivCost}
+    \parpar{\cC}{\hat{y}_r} = - \frac{y_r}{\hat{y}_r}
 \end{align}
 
-There are myriad cost functions and we're told that some work better in some circumstances, etc. but for this document I'm only going to employ the cross-entropy cost.
+There are myriad cost functions and we're told that some work better in some circumstances. For this document we're only going to consider the cross-entropy cost.
 
 \subsection{Testing Vs. Training Data}
-Most researches will take a portion of their data set and set it aside to insure that it will not be used for training the model. This data is then available to test how well the model performs on data it has not seen before. This set aside is known as a \textit{test dataset}. The term \textit{training data} refers to the majority of the original data set that is available to train the model.
+Most researches will take a portion of their data set and set it aside to insure that it will not be used for training the model. This data is then available to test how well the newly trained model performs on data it has not seen before. This set aside is known as a \textit{test dataset}. The term \textit{training data} refers to the majority of the original data set that remains available to train the model via back-propagation.
 
 \section{Back-Propagation}
-Now we have all the pieces in place to discuss back-propagation, an algorithm for refining ours weights and biases to iteratively reduce the overall cost of our training set. 
+Now we have all the pieces in place to discuss back-propagation, an algorithm for refining ours weights and biases to iteratively reduce the overall cost associated with our training set. 
 
 \begin{align}
     \label{eqn:deltas}
@@ -97,112 +92,107 @@ Now we have all the pieces in place to discuss back-propagation, an algorithm fo
     %
     \Delta \bld{b} & \approx - \alpha \parpar{\cC}{\bld{b}}
 \end{align}
-We may imagine these equations as the first order terms in Taylor expansions of the Cost function in terms of our weights and biases, and interpret our efforts as computing first order approximations to the platonic $\Delta$'s. The partial derivatives on the right can be expanded using the chain rule. We may interpret this expansion as our proceeding progressively backwards through the network layer-by-layer. We start with outputs of the output layer itself, differentiate with respect to (wrt) the output layer's inputs, then cross to its prior's outputs and on and on.
+We may imagine these equations as the first order terms in Taylor expansions of the Cost function in terms of our weights and biases, and interpret our efforts as computing first order approximations to the platonic $\Delta$'s. The partial derivatives on the right can be expanded using the chain rule. We may interpret this expansion as our proceeding progressively backwards through the network layer-by-layer. We start with outputs of the output layer itself, differentiate with respect to (wrt) the output layer's inputs, then cross to the prior layer's outputs and so on.
 
 Lets consider only the output layer, layer $f$, and evaluate our approximations to $\Delta \bld{W}^f$ and $\Delta \bld{b}^f$ in the hopes that this simplest layer will be instructive. We have
 \begin{align}
-    \parpar{\cC}{W^f_{n m}} = \parpar{\cC}{a^f_m} \parpar{a^f_m}{z^f_m} \parpar{z^f_m}{W^f_{n m}}
+    \parpar{\cC}{W^f_{p n}} = \parpar{\cC}{a^f_n} \parpar{a^f_n}{z^f_n} \parpar{z^f_n}{W^f_{p n}}
 \end{align}
-Note that we're playing a bit fast-and-loose with the notation. The first term is a simple vector. But you could well argue that we've a little dishonest in the second term by assuming that node index on both top and bottom could be the same. In general that is certainly not true, but it in this case we'll be able to support our claim when we expand the term. Our high-handedness does require some care in implementation. We have smashed this second term which should have been a diagonal matrix down to a vector and now the first two terms are not connected by a dot product but instead by element-wise multiplication. But we saved a lot of wasteful flops in the process. 
+Note that we're playing a bit fast and loose with the notation. The first term is a simple vector. But you could well argue that we've been a little dishonest in the second term by assuming that the node index on both top and bottom should be the same. In general that is certainly not true, but it in this case we'll be able to support the claim when we expand the term. However, our high-handedness does require some care in implementation. We have smashed this second term, which should have been a diagonal matrix, down to a vector and now the first two terms are not connected by the dot product one might have expected, but instead by element-wise multiplication. On the plus side we have saved a lot of wasteful flops in the process. 
 
-Even the repeated $m$-index in the third term might both you, and indeed in this bizarre the $m$ will drop out completely and we'll be left with a term that depends solely on $n$ which we can only connect with the first two terms, with which no index is shared, with an outer product.
+Similarly, the repeated $n$-index in the third term might bother you, and indeed in this  the $n$ will drop out completely and we'll be left with a term that depends solely on $n$ which we can only connect with the first two terms, with which no index is shared, with an outer product.
 
 
 \subsection{Output Layer Delta Weights}
 The first term is just a matter of grinding it out.
 \begin{align}
     \label{eqn:costWRTaF}
-    \parpar{\cC}{a^f_m} = - \left(\frac{y}{a^f_m} + \frac{(1 - y)}{(1 - a^f_m)}\right)
+    \parpar{\cC}{a^f_n} = - \frac{y}{a^f_n}
 \end{align}
-The results are useful, but clunky. We'll just refer to this term as $\parpar{\cC}{a^f_m}$ and say no more about it. The second term is more interesting.
-\begin{align}
-    \label{eqn:aWRTzF}
-    \parpar{a^f_m}{z^f_m} = g'(z^f_m)
-\end{align}
-or more generally, on layer $l$,
+The results are useful, but clunky. We'll just refer to this term as $\parpar{\cC}{a^f_n}$ and say no more about it. The second term is more interesting. It is obtained from the general layer $l$ expression
 \begin{align}
     \label{eqn:aWRTzL}
-    \parpar{a^l_m}{z^l_m} = g'(z^l_m)
+    \parpar{a^l_n}{z^l_n} = g'(z^l_n)
 \end{align}
-If it weren't for the scalar behavior of the activation function $g$ we wouldn't be able to get away with repeating the same index, top and bottom and thereby treating this term as a funny sort of vector.
+by subtituting $l \rightarrow f$. If it weren't for the scalar behavior of the activation function $g$ we wouldn't be able to get away with expressing this object as a vector with the same index appearing on both top and bottom of the derivative symbol.
 
 We will refer to the third term as the \textit{weights suffix} for reasons which we hope will become clear in a moment.
 \begin{align}
-    \label{eqn:zWRTweightsF}
-    \parpar{z^f_m}{W^f_{n m}} = a^{f-1}_n
-\end{align}
-Note how the $m$ index doesn't appear in the RHS. In general this term would have been a rank 3 object, but instead it's just another vector. In general, at layer $l$, this becomes
-\begin{align}
     \label{eqn:zWRTweightsL}
-    \parpar{z^l_m}{W^l_{n m}} = a^{l-1}_n
+    \parpar{z^l_n}{W^l_{p n}} = a^{l-1}_p
 \end{align}
+As above we must take this general layer-$l$ expression and subtitute $l \rightarrow f$ in reference to the final layer. Note how the $n$ index doesn't appear in the RHS. In general this term would have been a rank 3 object (one with 3 indices) except that we are contracting (summing over) 2 of these indices leaving us with a 1 index object, a vector.
 
-Putting those three, (\ref{eqn:costWRTaF}), (\ref{eqn:aWRTzF}), (\ref{eqn:zWRTweightsF}), together, along with the appropriate forms of generalized matrix multiplication, we have the core of the output layer's delta weights.
+Putting those three, (\ref{eqn:costWRTaF}), (\ref{eqn:aWRTzF}), (\ref{eqn:zWRTweightsF}), together, along with the appropriate forms of array multiplication, we have the core of the output layer's delta weights.
 \begin{align}
     \label{eqn:costWRTweightsF}
-    \parpar{\cC}{W^f_{n m}} = \left(\parpar{\cC}{a^f_m} \times g'(z^f_m) \right) \otimes a^{f-1}{n}
+    \parpar{\cC}{W^f_{p n}} = \left(\parpar{\cC}{a^f_n} \times g'(z^f_n) \right) \otimes a^{f-1}{p}
 \end{align}
 We use the $\times$ operator to denote element-wise multiplication, and the $\otimes$ operator to denote an outer product.
 
 
 \subsection{Output Layer Delta Biases}
-Luckily, the same calculation for the biases is similar. In fact the first two terms are identical, and the third changes in a predictable way. Note how the denominator changes from $W^f_{m n}$ to $b^f_m$ as we switch from calculating $\Delta \bld{W}$ to calculating $\Delta \bld{b}$.
+Now that we understand the crucial part of the $\Delta \bld{W}^f$ we would like to extend that understanding to the equivalent formula for the final layer biases, $\Delta \bld{b}^f$. The baises will turn out to be slightly simpler than the weights.
 \begin{align}
-    \label{eqn:zWRTbiasesF}
-    \parpar{z^f_m}{b^f_m} = 1_m
+    \label{eqn:costWRTbiasesF}
+    \parpar{\cC}{b^f_n} = \parpar{\cC}{a^f_n} \parpar{a^f_n}{z^f_n} \parpar{z^f_n}{b^f_n}
 \end{align}
-Since this just a vector of ones and it is to be applied multiplicatively, we just drop it all-together. The first two terms of the delta biases are identical to those for the delta weights. This is why we refer to the third term in delta weights as the \textit{weights suffix}  (\ref{eqn:zWRTweightsF}); it is the additional term that converts the delta biases into the delta weights. This is true for every layer.
-
+where we note that 
+\begin{align*}
+    \parpar{z^f_n}{b^f_n} = 1_n
+\end{align*}
+leaving us with
 \begin{align}
     \parpar{\cC}{b^f_m} = \parpar{\cC}{a^f_m} \times g'(z^f_m)
 \end{align}
-The third term is simply absent.
+where we have dropped the unnecessary vector of 1s. 
+Having dropped the third term entirely we wind up with an expression similar to but simpler than that for the weights, Eqn. (\ref{eqn:costWRTweightsF}). (Note how the denominator changes from $W^f_{m n}$ to $b^f_m$ as we switch from calculating $\Delta \bld{W}$ to calculating $\Delta \bld{b}$.)
 
-For every layer our procedure will be to compute the delta biases first, and then apply the weights suffix to construct the delta weights, thereby saving a lot of wasted computation.
+We refer to the third term that remains in delta weights, but is absent from delta biases, as the \textit{weights suffix}  (\ref{eqn:zWRTweightsF}); it is the additional term that converts the delta biases into the delta weights. This is true for every layer. Our procedure will be to compute the delta biases first, and then apply the weights suffix to construct the delta weights for the same layer, thereby saving a lot of wasted computation.
 
 \subsection{Layer $f-1$}
 Let's examine the same derivation extended slightly to address the last interior layer, layer $f-1$. You'll note that the full formula for the $f-1$ layer delta weights is very similar to that for layer $f$. We make a tiny modification to the weights suffix, and we add two new, but very familiar, terms in the middle.
 
 As before we simply walk up through the layers, from output to input and to the prior layer's output.
 \begin{align}
-    \parpar{\cC}{W^{f-1}_{n m}} = & \parpar{\cC}{a^f_m} \parpar{a^f_m}{z^f_m} & \textit{start monomer}\nonumber \\
-    & \left(\parpar{z^f_m}{a^{f-1}_n} \parpar{a^{f-1}_n}{z^{f-1}_n} \right) & \textit{monomer}\nonumber \\
-    & \parpar{z^{f-1}_n}{W^{f-1}_{p n}} & \textit{weights suffix}
+    \parpar{\cC}{W^{f-1}_{q p}} = & \parpar{\cC}{a^f_n} \parpar{a^f_n}{z^f_n} & \textit{start monomer}\nonumber \\
+    & \cdot \left(\parpar{z^f_n}{a^{f-1}_p} \parpar{a^{f-1}_p}{z^{f-1}_p} \right) & \textit{monomer}\nonumber \\
+    & \cdot \parpar{z^{f-1}_p}{W^{f-1}_{q p}} & \textit{weights suffix}
 \end{align}
-Here we have adapted a term from Chemistry, chains of monomers make up polymers. By analogy, sequences of our monomers polymerize into a chainlike formula for delta weights and delta biases.
+A chemist would tell us that a chain of monomers makes a polymer. By analogy, sequences of our monomers polymerize into a chainlike formula for delta weights and delta biases.
 
 \subsection{Establishing The Pattern On Layer $f-2$}
 Just for fun let's jump right to $f-2$ just to see if we can identify the pattern that makes this problem tractable.
 \begin{align}
-    \parpar{\cC}{W^{f-2}_{n m}} = & \parpar{\cC}{a^f_m} \parpar{a^f_m}{z^f_m} & \textit{start monomer} \nonumber \\
-        & \left(\parpar{z^f_m}{a^{f-1}_n} \parpar{a^{f-1}_n}{z^{f-1}_n} \right) & \textit{monomer $(f-1)$} \nonumber \\
-        & \left(\parpar{z^{f-1}_n}{a^{f-2}_p} \parpar{a^{f-2}_p}{z^{f-2}_p} \right) & \textit{monomer $(f-2)$} \nonumber \\
-        & \parpar{z^{f-2}_p}{W^{f-2}_{q p}} & \textit{weights suffix}
+    \parpar{\cC}{W^{f-2}_{r q}} = & \parpar{\cC}{a^f_n} \parpar{a^f_n}{z^f_n} & \textit{start monomer} \nonumber \\
+        & \cdot \left(\parpar{z^f_n}{a^{f-1}_p} \parpar{a^{f-1}_p}{z^{f-1}_p} \right) & \textit{monomer $(f-1)$} \nonumber \\
+        & \cdot \left(\parpar{z^{f-1}_p}{a^{f-2}_q} \parpar{a^{f-2}_q}{z^{f-2}_q} \right) & \textit{monomer $(f-2)$} \nonumber \\
+        & \parpar{z^{f-2}_q}{W^{f-2}_{r q}} & \textit{weights suffix}
 \end{align}
 
-The grand realization here is that we can calculate the delta weights and delta biases for any layer in any neural network just by inserting as many factors of the monomer as required to reach the target layer.
+The key realization here is that we can calculate the delta weights and delta biases for any layer in any neural network just by inserting as many factors of the monomer as required to reach the target layer.
 
 We've already evaluated the \textit{start monomer} (the first two terms in eqn. (\ref{eqn:costWRTweightsF}))
 \begin{align}
     \label{eqn:startMonomer}
-    \parpar{\cC}{a^f_m} \parpar{a^f_m}{z^f_m} = \parpar{\cC}{a^f_m} \times g'(z^f_m)
+    \parpar{\cC}{a^f_n} \parpar{a^f_n}{z^f_n} = \parpar{\cC}{a^f_n} \times g'(z^f_n)
 \end{align}
 and the \textit{weights suffix}, eqn. (\ref{eqn:zWRTweightsL}). That just leaves us to evaluate the monomer, starting at layer $f-1$.
 \begin{align}
     \label{eqn:monomerAtFm1}
-    \parpar{z^f_m}{a^{f-1}_n} \parpar{a^{f-1}_n}{z^{f-1}_n} = W^f_{n m} \times g'(z^{f-1}_n)
+    \parpar{z^f_n}{a^{f-1}_p} \parpar{a^{f-1}_p}{z^{f-1}_p} = W^f_{p n} \times g'(z^{f-1}_p)
 \end{align}
 Extending the monomer pattern to layer $f-2$ we have
 \begin{align}
     \label{eqn:monomerAtFm2}
-    \parpar{z^{f-1}_n}{a^{f-2}_p} \parpar{a^{f-2}_p}{z^{f-2}_p} = W^{f-1}_{p n} \times g'(z^{f-2}_p)
+    \parpar{z^{f-1}_p}{a^{f-2}_q} \parpar{a^{f-2}_q}{z^{f-2}_q} = W^{f-1}_{q p} \times g'(z^{f-2}_q)
 \end{align}
 In general we have 
 \begin{align}
     \label{eqn:monomerForTargetL}
-    \parpar{z^{l+1}_m}{a^l_n} \parpar{a^l_n}{z^l_n} = W^{l+1}_{n m} \times g'(z^l_n)
+    \parpar{z^{l+1}_n}{a^l_p} \parpar{a^l_p}{z^l_p} = W^{l+1}_{p n} \times g'(z^l_p)
 \end{align}
-which is a matrix. Were we to choose to target layer $f-3$ we anticate that we would have to insert three of these monomers, one targeting layer $f-1$, the next targeting layer $f-2$ and the third targeting layer $f-3$. Not only that but the delta biases for the previous target layer provides the starting point for this target layer. Between any two adjacent layers we need only perform a single matrix multiplication.
+which is a matrix. Were we to choose to target layer $f-3$ we anticate that we would have to insert three of these monomers, one targeting layer $f-1$, the next targeting layer $f-2$ and the third targeting layer $f-3$. Not only that, but the delta biases for the subsequent layer provides the starting point for this layer. Between any two adjacent layers we need only perform a single matrix multiplication.
 
 The general formula for delta biases for arbitrary layer $l$ is
 \begin{align}
@@ -213,7 +203,7 @@ The general formula for delta biases for arbitrary layer $l$ is
 where, unless denoted $\times$ or $\otimes$, multiplication is standard matrix multiplication. The delta weights is very similar.
 \begin{align}
     \label{eqn:deltaWeights}
-    \Delta \bld{W}^l = {\left( \left( \parpar{\cC}{\bld{a}^f} \times g'(\bld{z}^f) \right) \
+    \Delta \bld{W}^l = - \alpha {\left( \left( \parpar{\cC}{\bld{a}^f} \times g'(\bld{z}^f) \right) \
         \prod_{k = f-1}^l {\left( \bld{W}^k \times g'(\bld{z}^k) \right)}^T \otimes \bld{a}^{l-1} \right)}^T
 \end{align}
 These are the two equations required for back-propagation. 
@@ -221,6 +211,6 @@ These are the two equations required for back-propagation.
 \section{Implementation Notes}
 We have expressed eqns. (\ref{eqn:deltaBiases}) and (\ref{eqn:deltaWeights}) in terms of matrix operations rather than in our preferred component notation because the implementation is simpler.
 
-Note that we a poor choice for the indexing of $W^l_{b a}$. The motivation was that the first index, in this case $b$, would enumerate the prior layer's nodes and the second index, $a$, this layer's nodes. At the time this seemed reasonable enough. Unfortunately it winds requiring each monomer to be transposed before it can be applied. It would have been cleaner to have chosen $W^l_{a b}$.
+Note that we made a poor choice for the indexing of $W^l_{b a}$. The motivation was that the first index, in this case $b$, would enumerate the prior layer's nodes and the second index, $a$, this layer's nodes. At the time this seemed reasonable enough. Unfortunately it winds up requiring each monomer to be transposed before it can be applied. It would have been cleaner to have chosen $W^l_{a b}$.
 
 \end{document}
