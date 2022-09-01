@@ -163,6 +163,9 @@ class MeanVarianceConditioner():
 
 class InstanceLabelZipper():
     def zipper(instances, labels):
+        """
+        Joins the np.array arguments into a single np.array
+        """
         num_features = instances.shape[0]
         num_labels = labels.shape[0]
         num_examples = instances.shape[1]
@@ -176,6 +179,9 @@ class InstanceLabelZipper():
         return result
 
     def unzipper(num_features: int, examples: np.array):
+        """
+        Restores the instance/label pair to separate objects.
+        """
         assert len(examples.shape) == 2
         return (examples[0:num_features,...], examples[num_features:,...])
 
