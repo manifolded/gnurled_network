@@ -336,7 +336,9 @@ class PreparatoryUtils():
         """
         num_features, num_examples = examples.shape
         num_blocks = num_examples//block_size
-        assert num_blocks*block_size == num_examples
+        # Discard any residual examples that don't make a full batch
+        assert num_blocks*block_size <= num_examples
+
         blocks = [np.empty((num_features, block_size)) for _ in range(num_blocks)]
 
         for m in range(num_blocks*block_size):
