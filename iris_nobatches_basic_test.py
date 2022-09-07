@@ -12,7 +12,7 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 import network as nwk
-from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils, DeltaWeightsAndBiases
+from utils import CategoricalCrossEntropy, MeanVarianceConditioner, InstanceLabelZipper, ArrayUtils, PreparatoryUtils, DeltaWeightsAndBiases, Sigmoid
 
 start_time = time.process_time()
 rng = np.random.default_rng(12345678)
@@ -36,13 +36,14 @@ rng.shuffle(examples, axis=1)
 training_examples = examples[...,:120]
 test_examples = examples[...,120:]
 
-learning_rate = 10.0
+learning_rate = 1.0
 
 ### Construct network
 layer_sizes = (4,5,3)
 network = nwk.Network(layer_sizes, 
-                      (lambda x: ArrayUtils.gen_func_array(x, rng.standard_normal)), 
-                      CategoricalCrossEntropy)
+                      (lambda x: ArrayUtils.gen_func_array(x, rng.standard_normal)),
+                      CategoricalCrossEntropy,
+                      Sigmoid)
 
 training_conditioned_instances, training_labels = InstanceLabelZipper.unzipper(num_features, training_examples)
 num_examples = training_examples.shape[1]
