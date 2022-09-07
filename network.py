@@ -1,5 +1,5 @@
 import numpy as np
-from utils import Activation, RandomUtils, ArrayUtils, DeltaWeightsAndBiases
+from utils import RandomUtils, ArrayUtils, DeltaWeightsAndBiases
 from numpy.testing import assert_array_equal, assert_almost_equal
 class Layer():
     """
@@ -16,8 +16,14 @@ class Layer():
     A Layer must check if its previous layer is a InjectionLayer because this 
     situation dictates that the init_input_weights_2D be the identity matrix.
     """
-    def __init__(self, size: int, init_input_weights_2D: np.array, 
-                 init_biases_1D: np.array, input_layer):
+    def __init__(
+        self, 
+        size: int, 
+        init_input_weights_2D: np.array, 
+        init_biases_1D: np.array, 
+        input_layer,
+        activation: callable,
+    ):
         assert(size > 0),\
             f"layer sizes must be strictly positive, not ({size})"
 
@@ -37,6 +43,7 @@ class Layer():
 
         self.size = size
         self.input_layer = input_layer
+        self.activation = activation
         self.input_weights = init_input_weights_2D
         self.biases = init_biases_1D
 
@@ -86,14 +93,16 @@ class Layer():
         return result
 
     def outputs(self, input_values: np.array) -> np.array:
-        return np.vectorize(Activation.sigmoid)(self._coalesced_inputs(input_values))
+        # return np.vectorize(self.activation.activation)(self._coalesced_inputs(input_values))
+        return self.activation.activation(self._coalesced_inputs(input_values))
 
 class Network():
     """
     Holds the list of Layers that defines the network. Also provides convenient
     initialization and update methods.
     """
-    def __init__(self, layer_sizes: tuple, array_generator: callable, cost_implementation: callable):
+    def __init__(self, layer_sizes: tuple, array_generator: callable, cost_implementation: callable,
+                        activation: callable):
         if isinstance(layer_sizes, tuple):
             assert all([size > 0 for size in layer_sizes])
         elif isinstance(layer_sizes, int):
@@ -103,13 +112,16 @@ class Network():
             assert False, 'Unreckonized layer_sizes specification. Try again.'
 
         self.cost_implementation = cost_implementation
+        self.activation = activation
 
         self.layers = []
         # Insert Layer 0
         self.layers.append(Layer(layer_sizes[0], 
                                  None,
                                  None,
-                                 None))
+                                 None,
+                                 activation,
+                                 ))
         # Insert all the rest
         # Skip the first, already constructed, entry
         for idx, size in enumerate(layer_sizes):
@@ -117,7 +129,9 @@ class Network():
                 self.layers.append(Layer(size, 
                                          array_generator((layer_sizes[idx - 1], size)),
                                          array_generator((size,)),
-                                         self.layers[idx - 1]))
+                                         self.layers[idx - 1],
+                                         activation,
+                                         ))
 
     def layer_sizes(self) -> tuple:
         layer_sizes = [layer.size for layer in self.layers]
@@ -161,7 +175,10 @@ class Network():
         outs = outputs if outputs is not None else self.outputs()
         return self.cost_implementation.cost_deriv(labels, outs)
 
-    def _deriv_a_wrt_z(self, layer_id: int, input_values: np.array) -> np.array:
+    def _deriv_a_wrt_z(self, 
+            layer_id: int, 
+            input_values: np.array
+        ) -> np.array:
         """
         Computes the derivative of the network's outputs with respect to the 
         nodes' coalesced inputs, often denoted as 'z^l_n'.
@@ -172,7 +189,9 @@ class Network():
         pre-activation outputs. It means the same thing. Designated z^l_n to 
         distinguish them from layer activations, always designated a^l_n.
         """
-        return Activation.deriv_sig(self.layers[layer_id]._coalesced_inputs(input_values))
+        return self.activation.derivative(
+            self.layers[layer_id]._coalesced_inputs(input_values)
+        )
         
     def _deriv_z_wrt_weights(self, layer_id: int, input_values: np.array) -> np.array:
         """
@@ -192,12 +211,12 @@ class Network():
         """
         Computes the dervative of 'z^l_n' in terms of the previous layer's
         post-activation node outputs 'a^(l-1)_m' which turns out to be the 
-        weights 'W^l_{m n}'
+        transpose of the weights 'W^l_{m n}'
 
         layer_id: int - 'l', which indicates to which layer these quantities 
             belong
         """        
-        return self.layers[layer_id].input_weights
+        return self.layers[layer_id].input_weights.T
 
     def _deriv_z_wrt_b(self, layer_id: int) -> np.array:
         """
@@ -214,7 +233,7 @@ class Network():
         l: int - The monomer crosses layers. This parameter designates the 
             upstream target layer, not the source layer.
         """
-        return np.einsum('pn,pm -> pnm', # when called on layer l = f-1
+        return np.einsum('de,egm -> dgm', # when called on layer l = f-1
                          self._deriv_z_wrt_a_m1(l+1), # layer f input weights
                          self._deriv_a_wrt_z(l, input_values)) # layer f-1 sigmoid(coalesced inputs)
 
@@ -250,11 +269,11 @@ class Network():
             f'predictions.shape = {predictions.shape}'
         assert deriv_cost_wrt_a.shape == (num_outputs, num_examples),\
             f'deriv_cost_wrt_a_f.shape = {deriv_cost_wrt_a.shape}'
-        assert deriv_a_wrt_z_f.shape == (num_outputs, num_examples),\
-            f'_deriv_a_wrt_z_f(final_layer).shape = {deriv_a_wrt_z_f.shape}'
+        assert deriv_a_wrt_z_f.shape == (num_outputs, num_outputs, num_examples),\
+            f'final layer: _deriv_a_wrt_z_f.shape = {deriv_a_wrt_z_f.shape}'
 
         result = DeltaWeightsAndBiases(self.layer_sizes(), num_examples)
-        start_monomer = np.einsum('nm,nm -> nm', deriv_cost_wrt_a, deriv_a_wrt_z_f)
+        start_monomer = np.einsum('cm,cdm -> dm', deriv_cost_wrt_a, deriv_a_wrt_z_f)
 
         # We will fill in the bias arrays starting at the final layer, and working
         # backwards.
@@ -267,7 +286,7 @@ class Network():
             # Postpend next monomer term as we progress through the 
             # network, starting with the final layer and working backwards.
             result[l,1] = \
-                np.einsum('nm,pnm -> pm', 
+                np.einsum('dm,dgm -> gm', 
                           result[l+1, 1],
                           self._compute_back_prop_monomer_for_target_l(l, input_values))
 
