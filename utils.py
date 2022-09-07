@@ -41,27 +41,57 @@ class ArrayUtils():
             return vector_val*result
 
 
-class Activation():
+class Sigmoid():
     """
-    Implementation of the classic node activation function called the sigmoid 
-    function, $\\frac{1}{1 + e^{-x}}$. Despite the fact that I will inevitably 
-    be coding up the derivative before long, I don't think I'm going to make 
-    this a class. I don't want the overhead of a constructor.
+    Implementation of the classic ctivation function called the sigmoid, 
+    $\\frac{1}{1 + e^{-x}}$.
     """
-    def sigmoid(input: np.array) -> np.array:
+    def activation(input: np.array) -> np.array:
         # Overflows will often show up here. There's no reason to try and catch
         # them. It's natural for the code to crash when it's wildly diverging.
         sigmoid_func = np.vectorize(lambda x: 1./(1. + exp(x * -1.)))
         return sigmoid_func(input)
 
-    def deriv_sig(input: np.array) -> np.array:
+    def derivative(input: np.array) -> np.array:
+        num_nodes = input.shape[0]
         exp_mx_func = np.vectorize(lambda x: exp(x * -1.))
-
-        # emx:np.float32 = exp(-input)
-        # assert emx > 0.,\
-        #     f'deriv_sig: exp(-x) should be strictly positive, not {emx}'
         deriv_sigmoid_func = np.vectorize(lambda emx: emx/((1. + emx)*(1. + emx)))
-        return deriv_sigmoid_func(exp_mx_func(input))
+        return np.einsum(
+            'im,ij->ijm',
+            deriv_sigmoid_func(exp_mx_func(input)),
+            np.diag(np.ones((num_nodes,))),
+        )
+
+
+class Softmax():
+    """
+    Implementation of the classic activation function called softmax, 
+    $\\frac{e^{z_i - max(z_i)}}{\sum_k e^{z_k - max(z_k)}}$.
+    """
+    def exp_of_norm(input: np.array) -> np.array:
+        return np.exp(input - np.amax(input, axis=0))
+
+    def activation(input: np.array) -> np.array:
+        # num_nodes, num_examples = input.shape
+        exp_norm_z = Softmax.exp_of_norm(input)
+        return exp_norm_z/np.sum(exp_norm_z, axis = 0)
+    
+        # norm_e_func = lambda vec: np.exp(vec - vec.max()) 
+        # softmax_func = np.vectorize(lambda vec: norm_e_func(vec)/np.sum(norm_e_func(vec)))
+        # return softmax_func(input)
+
+    def derivative(input: np.array) -> np.array:
+        num_nodes = input.shape[0]
+        sigma = Softmax.activation(input)
+        return np.einsum(
+            'im,ij->ijm',
+            sigma,
+            np.diag(np.ones((num_nodes,))),
+        ) - np.einsum(
+            'im,jm -> ijm',
+            sigma,
+            sigma,
+        )
 
 
 class BinaryCrossEntropy():
