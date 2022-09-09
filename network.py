@@ -1,6 +1,7 @@
 import numpy as np
 from utils import RandomUtils, ArrayUtils, DeltaWeightsAndBiases
 from numpy.testing import assert_array_equal, assert_almost_equal
+from typing import List, Tuple
 class Layer():
     """
     Layers are ranks of nodes of any length. These nodes all receive their inputs
@@ -21,8 +22,8 @@ class Layer():
         size: int, 
         init_input_weights_2D: np.array, 
         init_biases_1D: np.array, 
-        input_layer,
-        activation: callable,
+        input_layer: object,
+        activation: object,
     ):
         assert(size > 0),\
             f"layer sizes must be strictly positive, not ({size})"
@@ -50,7 +51,7 @@ class Layer():
     def size(self) -> int:
         return self.size
 
-    def add_delta_weights_and_biases_at_layer(self, delta_weights_and_biases: tuple):
+    def add_delta_weights_and_biases_at_layer(self, delta_weights_and_biases: Tuple[np.array]):
         delta_weights = delta_weights_and_biases[0]
         assert len(delta_weights.shape) == 2,\
             'delta_weights rank must be 2, not {}'\
@@ -101,9 +102,13 @@ class Network():
     Holds the list of Layers that defines the network. Also provides convenient
     initialization and update methods.
     """
-    def __init__(self, layer_sizes: tuple, array_generator: callable, cost_implementation: callable,
-                        activation: callable):
-        if isinstance(layer_sizes, tuple):
+    def __init__(self, 
+        layer_sizes: tuple, 
+        array_generator: object, 
+        cost_implementation: object,
+        activations: List[object]
+    ):
+        if isinstance(layer_sizes, Tuple):
             assert all([size > 0 for size in layer_sizes])
         elif isinstance(layer_sizes, int):
             assert layer_sizes > 0
@@ -112,15 +117,16 @@ class Network():
             assert False, 'Unreckonized layer_sizes specification. Try again.'
 
         self.cost_implementation = cost_implementation
-        self.activation = activation
+        self.activations = activations
+        assert len(activations) == len(layer_sizes)
 
         self.layers = []
-        # Insert Layer 0
+        # Insert Layer 0 - input layer
         self.layers.append(Layer(layer_sizes[0], 
                                  None,
                                  None,
                                  None,
-                                 activation,
+                                 activations[0],
                                  ))
         # Insert all the rest
         # Skip the first, already constructed, entry
@@ -130,7 +136,7 @@ class Network():
                                          array_generator((layer_sizes[idx - 1], size)),
                                          array_generator((size,)),
                                          self.layers[idx - 1],
-                                         activation,
+                                         activations[idx],
                                          ))
 
     def layer_sizes(self) -> tuple:
@@ -189,7 +195,7 @@ class Network():
         pre-activation outputs. It means the same thing. Designated z^l_n to 
         distinguish them from layer activations, always designated a^l_n.
         """
-        return self.activation.derivative(
+        return self.activations[layer_id].derivative(
             self.layers[layer_id]._coalesced_inputs(input_values)
         )
         
