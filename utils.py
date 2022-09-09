@@ -466,7 +466,7 @@ class PreparatoryUtils():
 
 
 class ZeroOrOneMetric():
-    def __init__(self, width):
+    def __init__(self, width: np.float):
         self.costFunc = np.vectorize(lambda x: 2./(1./np.tanh((x/width)**2) + 1/np.tanh(((x - 1)/width)**2)))
 
     def cost(self, predictions: np.array) -> np.float:
