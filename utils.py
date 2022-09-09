@@ -238,6 +238,34 @@ class CategoricalCrossEntropy():
         return (lbls/prds) / -num_examples
 
 
+class L1():
+    def cost(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape
+        num_outputs, num_examples = predictions.shape
+        return np.sum(np.abs(predictions - labels))/(num_examples*num_outputs)
+
+    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape
+        num_outputs,_ = predictions.shape
+        return -np.vectorize(lambda x: 0. if x == 0. else 1. if x > 0. else -1.)(
+            labels - predictions
+        )/num_outputs
+
+
+class L2():
+    def cost(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape
+        num_outputs, num_examples = predictions.shape
+        deltas = labels - predictions
+        return np.sum(deltas*deltas)/(num_outputs*num_examples)
+
+    def cost_deriv(labels: np.array, predictions: np.array) -> np.array:
+        assert labels.shape == predictions.shape
+        num_outputs,_ = predictions.shape
+        deltas = labels - predictions
+        return -2.*deltas/num_outputs
+
+
 class MeanVarianceConditioner():
     def __init__(self, instances: np.array):
         num_features = instances.shape[0]

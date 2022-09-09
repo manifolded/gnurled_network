@@ -10,7 +10,8 @@ sys.path.append(
     os.path.dirname(os.path.realpath(__file__))
 )
 from network import Network
-from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, PreparatoryUtils, DeltaWeightsAndBiases, Sigmoid, Softmax
+from utils import BinaryCrossEntropy, ArrayUtils, CategoricalCrossEntropy, PreparatoryUtils, DeltaWeightsAndBiases
+from utils import Sigmoid, Softmax, L1, L2
 
 @pytest.fixture
 def single_feature_geometric_instances(num_examples: int):
@@ -312,5 +313,53 @@ def deriv_softmax_some_expected_outputs():
 
 def test_Given_deriv_softmax_When_someInputs_Then_agrees(softmax_some_inputs, deriv_softmax_some_expected_outputs):
     assert_almost_equal(Softmax.derivative(softmax_some_inputs), deriv_softmax_some_expected_outputs, 6)
+
+@pytest.fixture
+def l1_some_predictions():
+    return np.full((3,3), [[5.5,2.75,0.],
+                           [-2.3,0.,1000.],
+                           [0.23,2.75,0.]])
+
+@pytest.fixture
+def l1_some_labels():
+    return np.full((3,3), [[5.5,1.,0.],
+                           [-2.3,-0.97,0.],
+                           [0.23,1.,0.]])
+
+@pytest.fixture
+def l1_some_costs():
+    return np.full((1,), [111.608])
+
+def test_Given_L1_When_computeCost_Then_agrees(l1_some_predictions, l1_some_labels, l1_some_costs):
+    assert_almost_equal(L1.cost(l1_some_labels, l1_some_predictions), l1_some_costs, 3)
+
+@pytest.fixture
+def l1_some_derivs():
+    return np.full((3,3), [[0.,0.333333,0.],
+                           [0.,0.333333,0.333333],
+                           [0.,0.333333,0.]])
+
+def test_Given_L1_When_computeCostDerivs_Then_agrees(l1_some_predictions, l1_some_labels, l1_some_derivs):
+    assert_almost_equal(L1.cost_deriv(l1_some_labels, l1_some_predictions), l1_some_derivs, 6)
+
+@pytest.fixture
+def l2_some_costs():
+    return 111112.
+
+
+def test_Given_L2_When_computeCost_Then_agrees(l1_some_predictions, l1_some_labels, l2_some_costs):
+    assert_almost_equal(L2.cost(l1_some_labels, l1_some_predictions), l2_some_costs, 0)
+
+@pytest.fixture
+def l2_some_derivs():
+    return np.full((3,3), [[0.,1.16667,0.],
+                           [0.,0.646667,666.667],
+                           [0.,1.16667,0.]])
+
+def test_Given_L2_When_computeCostDerivs_Then_agrees(l1_some_predictions, l1_some_labels, l2_some_derivs):
+    assert_almost_equal(L2.cost_deriv(l1_some_labels, l1_some_predictions), l2_some_derivs, 3)
+
+
+
 
 
