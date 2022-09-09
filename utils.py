@@ -66,7 +66,7 @@ class Sigmoid():
 class Softmax():
     """
     Implementation of the classic activation function called softmax, 
-    $\\frac{e^{z_i - max(z_i)}}{\sum_k e^{z_k - max(z_k)}}$.
+    $\\frac{e^{z_i - max(z_i)}}{\\sum_k e^{z_k - max(z_k)}}$.
     """
     def exp_of_norm(input: np.array) -> np.array:
         return np.exp(input - np.amax(input, axis=0))
@@ -91,6 +91,61 @@ class Softmax():
             'im,jm -> ijm',
             sigma,
             sigma,
+        )
+
+
+class Relu():
+    def activation(input: np.array) -> np.array:
+        return np.vectorize(lambda x: x if x>0. else 0.)(input)
+
+    def derivative(input: np.array) -> np.array:
+        num_nodes = input.shape[0]
+        return np.einsum(
+            'im,ij->ijm',
+            np.vectorize(lambda x: 1 if x>0. else 0.)(input),
+            np.diag(np.ones((num_nodes,))),
+        )
+
+
+class ReluFloor():
+    def __init__(self, floor: float):
+        self.floor = floor
+    
+    def activation(self, input: np.array) -> np.array:
+        return np.vectorize(lambda x: x if x>self.floor else self.floor)(input)
+
+    def derivative(self, input: np.array) -> np.array:
+        num_nodes,_ = input.shape
+        return np.einsum(
+            'im,ij->ijm',
+            np.vectorize(lambda x: 1 if x>self.floor else 0.)(input),
+            np.diag(np.ones((num_nodes,)))
+        )
+
+
+class Linear():
+    def activation(input: np.array) -> np.array:
+        return input
+    
+    def derivative(input: np.array) -> np.array:
+        num_nodes, num_examples = input.shape
+        return np.einsum(
+            'im,ij->ijm',
+            np.full((num_nodes, num_examples), 1.),
+            np.diag(np.ones((num_nodes,)))
+        )
+
+
+class ExponentialLinearUnit():
+    def activation(input: np.array) -> np.array:
+        return np.vectorize(lambda x: x if x>=0. else np.exp(x) - 1.)(input)
+
+    def derivative(input: np.array) -> np.array:
+        num_nodes, num_examples = input.shape
+        return np.einsum(
+            'im,ij->ijm',
+            np.vectorize(lambda x: 1. if x>=0. else np.exp(x))(input),
+            np.diag(np.ones((num_nodes,)))
         )
 
 
@@ -146,6 +201,12 @@ class CategoricalCrossEntropy():
             prds = np.expand_dims(predictions, axis=-1)
 
         vlog = np.vectorize(log)
+        # prds = np.vectorize(lambda x: 1.E-8 if x==0. else x if x > 0 else -x)(prds)
+        assert np.all(prds > 0.),\
+            f"""
+            CategoricalCrossEntropy requires that all predictions be strictly 
+            positive, but the minimum value was ({prds.min()}).
+            """
         num_outputs, num_examples = lbls.shape
         result = 0.0
         # Using for loop over outputs nodes to restrict ourselves to only those
