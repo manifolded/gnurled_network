@@ -50,9 +50,9 @@ want to get this one working first.
     [x] Modify _deriv_a_wrt_z() to return (n,m) shaped arrays
     [x] Omitted biases and weights should be None, not empty
     [ ] _deriv_a_wrt_z(), why does it recompute from input_values?
-    [ ] Individual inputs are called attributes. What are outputs called?
-        - Features?
-    [ ] Create delta_weights_and_biases type with overloaded operators
+    [x] Individual inputs are called attributes. What are outputs called? - Predictions!
+    [x] Create delta_weights_and_biases type with overloaded operators
     [x] Remove duplicate DeltasFunnel.average() and PreparatoryUtils.average_of_bulk_deltas
     [x] Strip extraneous member data from DeltaWeightsAndBiases
+    [ ] Implement learning rate decay
     [ ] 
