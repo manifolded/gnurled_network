@@ -20,7 +20,8 @@ def single_feature_geometric_instances(num_examples: int):
 def test_Given_oneOneNetwork_When_unitInput_Then_layer_0_coalesced_output():
     num_examples = 1
     unit_array = ArrayUtils.all_ones_array((1, num_examples))
-    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, 
+        [Sigmoid, Sigmoid], lambda epoch: 1.0)
     assert_array_equal(network.layers[0]._coalesced_inputs(unit_array), unit_array) 
 
 # --- Write type sensitive unit test that complains about np.float64 ---
@@ -32,21 +33,24 @@ def test_Given_oneOneNetwork_When_unitInput_Then_layer_0_coalesced_output():
 def test_Given_oneOneNetwork_When_unitInput_Then_layer_0_sigmoid_output():
     num_examples = 1
     unit_array = ArrayUtils.all_ones_array((1, num_examples))
-    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, 
+        [Sigmoid, Sigmoid], lambda epoch: 1.0)
     expected_value: np.float32 = 0.731059
     assert_almost_equal(network.layers[0].outputs(unit_array), unit_array*expected_value, 6) 
 
 def test_Given_oneOneNetwork_When_unitInput_Then_sigmoid_output():
     num_examples = 1
     unit_array = ArrayUtils.all_ones_array((1, num_examples))
-    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy,
+        [Sigmoid, Sigmoid], lambda epoch: 1.0)
     expected_value: np.float32 = 0.849548
     assert_almost_equal(network.outputs(unit_array), unit_array*expected_value, 6) 
 
 def test_Given_oneOneNetwork_When_unitInput_Then_output_agrees():
     instances = [1., 0.5]
     input_array = np.full((1,len(instances)), instances, dtype=np.float32)
-    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, 
+        [Sigmoid, Sigmoid], lambda epoch: 1.0)
     expected_output_values = [0.849548, 0.835134]
     expected_outputs = np.full((1,2), expected_output_values, dtype=np.float32)
     assert_almost_equal(network.outputs(input_array), expected_outputs, 6) 
@@ -54,7 +58,8 @@ def test_Given_oneOneNetwork_When_unitInput_Then_output_agrees():
 def test_Given_oneOneNetwork_When_multInputs_Then_binaryCrossEntropy_cost_agrees():
     input_array = ArrayUtils.all_ones_array((1, 1))
     labels = np.full((1,1), [1.], dtype=np.float32)
-    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,1), ArrayUtils.all_ones_array, BinaryCrossEntropy, 
+        [Sigmoid, Sigmoid], lambda epoch: 1.0)
     expected_cost: np.float32 = 0.163051 # via Mathematica
     assert_almost_equal(network.cost(labels, network.outputs(input_array)), 
                         expected_cost, 6) 
@@ -88,7 +93,9 @@ def test_Given_1layerNetwork_When_deriv_a_wrt_z_Then_agrees():
     network = Network((2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid], 
+                      lambda epoch: 1.0,
+                     )
     deriv_a_wrt_z = network._deriv_a_wrt_z(0, inputs)
     verified_deriv_a_wrt_z = np.array([[[0.209773,0.217895,0.225348], [0.,0.,0.]],
                                        [[0.,0.,0.], [0.232008,0.237759,0.242497]]])
@@ -101,7 +108,9 @@ def test_Given_1layerNetwork_When_deriv_cost_wrt_predictions_Then_agrees():
     network = Network((2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     preds = network.outputs(inputs)
     deriv_cost_wrt_preds = CategoricalCrossEntropy.cost_deriv(labels, preds)
     verified_deriv_cost_wrt_preds = np.array([[-0.428224,-0.392631,-0.355144],
@@ -117,7 +126,9 @@ def test_Given_2layerNetwork_When_deriv_cost_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     predictions = network.outputs(inputs)
     verified_deriv_cost = np.array([[-0.421902,-0.377366,-0.332367],
                                     [-0.28685,-0.240762,-0.194051]])
@@ -130,7 +141,9 @@ def test_Given_2layerNetwork_When_deltaWeightsAndBiases_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_deriv_a_wrt_z_l1 = np.array([[[0.205451,0.207295,0.209182], [0.,0.,0.]],
                                           [[0.,0.,0.], [0.211101,0.213042,0.214992]]])
                                           # Computed via Mathematica
@@ -142,7 +155,9 @@ def test_Given_2layerNetwork_When_derivZwrtWeights_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_deriv_z_wrt_weights = np.array([[0.700567,0.679179,0.65701],
                                              [0.634136,0.610639,0.586618]])
                                               # Computed via Mathematica
@@ -155,11 +170,13 @@ def test_Given_2layerNetwork_When_computeBiases_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_delta_biases = np.array([[0.0866802,0.0782261,0.069525],
                                       [0.0605543,0.0512924,0.0417194]])
                                       # Computed via Mathematica
-    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 0)
     # delta_biases = delta_wAndB[-1][1]
     delta_biases = delta_wAndB[-1, 1]
     assert_almost_equal(delta_biases, verified_delta_biases, 7)
@@ -170,11 +187,13 @@ def test_Given_2layerNetwork_When_computeWeights_Then_agrees():
     network = Network((2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_delta_weights = np.array([[[0.0607253,0.0531295,0.0456787],[0.0424223,0.0348367,0.0274101]],
                                        [[0.054967,0.0477679,0.0407846],[0.0383996,0.0313211,0.0244733]]])
                                          # Computed via Mathematica
-    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 0)
     # delta_weights = delta_wAndB[-1][0]
     delta_weights = delta_wAndB[-1, 0]
     assert_almost_equal(delta_weights[:,:,0], verified_delta_weights[:,:,0], 7)
@@ -185,7 +204,8 @@ def test_Given_3layerNetwork_When_computePredictions_Then_agrees():
     network = Network((2,2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid, Sigmoid],
+                      lambda epoch: 1.0)
     verified_predictions = np.array([[0.713218,0.712315,0.711368],[0.71038,0.709353,0.708292]])
                                       # Computed via Mathematica
     predictions = network.outputs(inputs)
@@ -197,7 +217,9 @@ def test_Given_3layerNetwork_When_computeBiases_Then_agrees():
     network = Network((2,2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_delta_biases = np.array([[0.0176759,0.0159029,0.0140879],[0.0122278,0.01032,0.00836197]])
                                       # Computed via Mathematica
     delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
@@ -211,11 +233,13 @@ def test_Given_3layerNetwork_When_computeWeights_Then_agrees():
     network = Network((2,2,2), 
                       (lambda x: ArrayUtils.identity_arrays_and_uniform_vectors(x, 0.2)), 
                       CategoricalCrossEntropy,
-                      Sigmoid)
+                      [Sigmoid, Sigmoid, Sigmoid],
+                      lambda epoch: 1.0,
+                      )
     verified_delta_weights = np.array([[[0.0123831,0.0108009,0.00925588],[0.00856641,0.0070091,0.0054939]],
                                        [[0.0112089,0.00971091,0.00826419],[0.0077541,0.00630178,0.00490528]]])
                                       # Computed via Mathematica
-    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 1.)
+    delta_wAndB = network.compute_DeltaWeightsAndBiases(labels, inputs, 0)
     # delta_weights = delta_wAndB[1][0]
     delta_weights = delta_wAndB[1, 0]
     assert_almost_equal(delta_weights, verified_delta_weights, 7)
@@ -279,7 +303,8 @@ def test_Given_toyDWABs_When_applyToNetwork_Then_success(toy_deltas, average_del
     num_layers = toy_DWABs.getNumLayers()
     average_DWABs = toy_DWABs.average()
 
-    network = Network((1,2,1), ArrayUtils.all_zeros_array, BinaryCrossEntropy, Sigmoid)
+    network = Network((1,2,1), ArrayUtils.all_zeros_array, BinaryCrossEntropy, 
+        [Sigmoid, Sigmoid, Sigmoid], lambda epoch: 1.0,)
     network.add_DeltaWeightsAndBiases(average_DWABs)
     
     for l in range(1, num_layers):

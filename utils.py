@@ -466,16 +466,16 @@ class PreparatoryUtils():
 
 
 class ZeroOrOneMetric():
-    def __init__(self, width: np.float):
+    def __init__(self, width: np.float32):
         self.costFunc = np.vectorize(lambda x: 2./\
             (1./(np.tanh((x/width)**2) + 1.e-20) + \
              1./(np.tanh(((x - 1.)/width)**2) + 1.e-20)))
 
-    def cost(self, predictions: np.array) -> np.float:
+    def cost(self, predictions: np.array) -> np.float32:
         num_predictions, num_examples = predictions.shape
         return np.sum(self.costFunc(predictions))/(num_predictions*num_examples)
 
-    def sum(self, predictions: np.array) -> np.float:
+    def sum(self, predictions: np.array) -> np.float32:
         _, num_examples = predictions.shape
         return np.sum(predictions)/num_examples
 
